@@ -1,8 +1,8 @@
 # 01 — Product Spec
 
-## Product name placeholder
+## Product name
 
-`DeepSeek Agent App` — final branding can change.
+`DeepSeek Agent for macOS`
 
 ## Product thesis
 
@@ -69,15 +69,16 @@ A macOS local-first coding agent app that makes DeepSeek-TUI feel like a native 
 6. Fake runtime streams message/tool/approval/usage events.
 7. User approves or denies the sample approval.
 
-### Journey B: real DeepSeek-TUI runtime
+### Journey B: tester launch with real runtime
 
-1. User installs or points to `deepseek-tui` binary.
-2. User enters DeepSeek API key in Settings.
-3. App launches sidecar on loopback with bearer token.
-4. App creates a thread for the selected project.
-5. User sends message.
-6. Runtime streams events into UI.
-7. User reviews approvals and outputs.
+1. User downloads the release zip and opens `DeepSeek Agent.app`.
+2. User enters a DeepSeek-compatible URL, API key, and model in Settings.
+3. App saves the key in macOS Keychain.
+4. App launches the bundled sidecar on loopback with a fresh bearer token.
+5. App loads existing threads or creates a thread for the selected project.
+6. User sends a message.
+7. Runtime streams events into UI.
+8. User reviews approvals and outputs.
 
 ### Journey C: recover from sidecar crash
 
