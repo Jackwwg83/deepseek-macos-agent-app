@@ -2,6 +2,14 @@
 
 This document records the DeepSeek-TUI source details that shaped the app design.
 
+## 2026-05-15 local implementation refresh
+
+- Sibling repo inspected: `/Users/jackwu/projects/TUI-APP/DeepSeek-TUI`
+- Local binary smoke-tested: `/Users/jackwu/projects/TUI-APP/DeepSeek-TUI/target/debug/deepseek-tui`
+- Version from local binary: `deepseek-tui 0.8.37 (7c8c71eb03d8)`
+- Confirmed sidecar command shape: `serve --http --host 127.0.0.1 --port <port> --auth-token <token>`
+- Confirmed health endpoint under bearer auth: `GET /health` returned `{"status":"ok","service":"deepseek-runtime-api","mode":"local"}`
+
 ## Workspace
 
 The uploaded `Cargo.toml` shows a Rust workspace with these crates:

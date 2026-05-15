@@ -75,6 +75,21 @@ Starts fake runtime or launches app in fake runtime mode.
 
 Builds and opens unsigned debug app.
 
+### `scripts/dev/package_tester_alpha.sh`
+
+Builds a tester handoff package under `build/tester-alpha/`. The package includes:
+
+- `DeepSeek Agent.app`
+- bundled `web/dist`
+- bundled `deepseek-tui`
+- DeepSeek-TUI license and third-party notices
+- tester README
+- zip and checksum files
+
+### `scripts/dev/verify_tester_alpha.sh`
+
+Verifies the packaged `.app` and zip, launches the packaged app in fake mode, waits for the embedded WebView to render the fake runtime demo through the native bridge, and checks the bundled sidecar `/health` endpoint.
+
 ## Web tests
 
 Minimum TypeScript tests:
@@ -94,6 +109,8 @@ Minimum Swift unit tests:
 - Binary discovery respects `DEEPSEEK_TUI_BIN`.
 - Runtime API errors map to user-facing messages.
 - Bridge message decoding rejects unknown or malformed payloads.
+
+Current local note: full Xcode 26.1.1 is selected and standard `swift test` runs these XCTest cases. `macos/Scripts/test_unit.sh` falls back to a dependency-free Swift runner only if `swift test` is unavailable on a CLT-only machine.
 
 ## Contract tests
 
@@ -123,12 +140,18 @@ Acceptance steps:
 
 ## Manual real-runtime smoke test
 
-Prerequisites:
+For development scripts, the runtime can still be configured through environment variables:
 
 ```bash
 export DEEPSEEK_TUI_BIN=/absolute/path/to/deepseek-tui
 export DEEPSEEK_API_KEY=...
+export DEEPSEEK_BASE_URL=https://your-openai-compatible-endpoint/v1
+export DEEPSEEK_MODEL=deepseek-v4-flash
 ```
+
+Local automated coverage performs a narrow real sidecar health smoke when a binary is available: it starts `deepseek-tui serve --http` on `127.0.0.1` with a random test bearer token and verifies `GET /health`. Swift adapter tests also cover the actual DeepSeek-TUI Runtime API response shape for runtime info, threads, thread detail, start-turn `prompt` requests, and usage totals.
+
+For packaged tester builds, no environment variables should be required. Testers open `DeepSeek Agent.app`, enter their DeepSeek URL, API key, and model in the native settings sidebar, then click `Save & Start Runtime`.
 
 Acceptance steps:
 
@@ -141,6 +164,16 @@ Acceptance steps:
 7. Confirm streamed assistant response appears.
 8. Confirm no unapproved dangerous command runs.
 9. Stop/restart sidecar and confirm reconnect UI.
+
+## Packaged tester smoke test
+
+Acceptance steps:
+
+1. Run `bash scripts/dev/package_tester_alpha.sh`.
+2. Run `bash scripts/dev/verify_tester_alpha.sh`.
+3. Confirm `packaged-app-render-ok`.
+4. Confirm `packaged-sidecar-health-ok`.
+5. Confirm `verify-tester-alpha-ok`.
 
 ## Failure reporting
 

@@ -1,0 +1,11 @@
+node_modules/
+build/
+web/node_modules/
+web/dist/
+macos/.build/
+macos/.swiftpm/
+.DS_Store
+*.log
+*.tsbuildinfo
+*.xcuserdata/
+DerivedData/
