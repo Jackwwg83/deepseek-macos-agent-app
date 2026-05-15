@@ -4,71 +4,79 @@ Codex should not mark the goal complete until this checklist is satisfied or eac
 
 ## Repository and scripts
 
-- [ ] `macos/` app project exists.
-- [ ] `web/` embedded UI project exists.
-- [ ] `scripts/dev/bootstrap.sh` exists.
-- [ ] `scripts/dev/check.sh` exists.
-- [ ] `scripts/dev/run_fake_runtime.sh` exists.
-- [ ] `scripts/dev/run_macos_app.sh` exists.
-- [ ] `docs/PROGRESS.md` exists and is updated.
+- [x] `macos/` app project exists.
+- [x] `web/` embedded UI project exists.
+- [x] `scripts/dev/bootstrap.sh` exists.
+- [x] `scripts/dev/check.sh` exists.
+- [x] `scripts/dev/run_fake_runtime.sh` exists.
+- [x] `scripts/dev/run_macos_app.sh` exists.
+- [x] `docs/PROGRESS.md` exists and is updated.
 
 ## Native app
 
-- [ ] App builds in unsigned debug mode.
-- [ ] App opens a main window.
-- [ ] App loads embedded chat UI.
-- [ ] App has settings or onboarding for DeepSeek API key and sidecar path.
-- [ ] App has sidecar status display.
-- [ ] App stores API key in Keychain or clearly uses fake/dev mode.
+- [x] App builds in unsigned debug mode.
+- [x] App packages as a macOS `.app` bundle.
+- [x] App opens a main window.
+- [x] App loads embedded chat UI.
+- [x] App has settings for DeepSeek URL, API key, and model.
+- [x] App can start real runtime from in-app settings without terminal env vars.
+- [x] App has sidecar status display.
+- [x] App stores API key in Keychain or clearly uses fake/dev mode.
 
 ## Web UI
 
-- [ ] Thread list renders.
-- [ ] Active thread timeline renders.
-- [ ] Composer sends a prompt.
-- [ ] Assistant message streams.
-- [ ] Tool card renders.
-- [ ] Approval card/modal renders.
-- [ ] Usage/cost footer renders.
-- [ ] Disconnected/error state renders.
+- [x] Thread list renders.
+- [x] Active thread timeline renders.
+- [x] Composer sends a prompt.
+- [x] Assistant message streams.
+- [x] Tool card renders.
+- [x] Approval card/modal renders.
+- [x] Usage/cost footer renders.
+- [x] Disconnected/error state renders.
 
 ## Runtime
 
-- [ ] Fake runtime mode works without external credentials.
-- [ ] Sidecar manager can discover binary from `DEEPSEEK_TUI_BIN`.
-- [ ] Sidecar manager starts runtime on loopback.
-- [ ] Sidecar manager uses random token.
-- [ ] Runtime adapter calls `/health` and `/v1/runtime/info`.
-- [ ] Runtime adapter can create/list/get threads.
-- [ ] Runtime adapter can start a turn.
-- [ ] Runtime adapter can subscribe to events with `since_seq`.
-- [ ] Runtime adapter can send approval decision.
-- [ ] Runtime adapter can interrupt a turn.
-- [ ] Runtime adapter can query usage.
+- [x] Fake runtime mode works without external credentials.
+- [x] Sidecar manager can discover binary from `DEEPSEEK_TUI_BIN`.
+- [x] Sidecar manager can discover bundled sidecar binary from app resources.
+- [x] Sidecar manager starts runtime on loopback.
+- [x] Sidecar manager uses random token.
+- [x] Runtime adapter calls `/health` and `/v1/runtime/info`.
+- [x] Runtime adapter can create/list/get threads.
+- [x] Runtime adapter can start a turn.
+- [x] Runtime adapter can subscribe to events with `since_seq`.
+- [x] Runtime adapter can send approval decision.
+- [x] Runtime adapter can interrupt a turn.
+- [x] Runtime adapter can query usage.
 
 ## Security
 
-- [ ] DeepSeek API key is not committed.
-- [ ] Runtime token is not committed.
-- [ ] API key is not passed through command-line arguments.
-- [ ] WebView production code does not store runtime bearer token.
-- [ ] Logs redact secrets.
-- [ ] Sidecar binds to `127.0.0.1`.
+- [x] DeepSeek API key is not committed.
+- [x] Runtime token is not committed.
+- [x] API key is not passed through command-line arguments.
+- [x] API key is not written into tester package files.
+- [x] WebView production code does not store runtime bearer token.
+- [x] Logs redact secrets.
+- [x] Sidecar binds to `127.0.0.1`.
 
 ## Tests and checks
 
-- [ ] Web lint passes or blocker documented.
-- [ ] Web typecheck passes or blocker documented.
-- [ ] Web tests pass or blocker documented.
-- [ ] Swift build passes or blocker documented.
-- [ ] Swift tests pass or blocker documented.
-- [ ] Fake runtime smoke test passes.
-- [ ] Real runtime smoke test is documented.
+- [x] Web lint passes or blocker documented.
+- [x] Web typecheck passes or blocker documented.
+- [x] Web tests pass or blocker documented.
+- [x] Swift build passes or blocker documented.
+- [x] Swift tests pass or blocker documented.
+- [x] Fake runtime smoke test passes.
+- [x] Real runtime smoke test is documented.
+- [x] Real runtime model-turn smoke passes with a valid third-party HTTPS endpoint.
+- [x] Tester alpha package builds.
+- [x] Tester alpha package verification passes.
 
 ## Documentation
 
-- [ ] README explains setup.
-- [ ] Settings/onboarding explains DeepSeek API key.
-- [ ] Sidecar binary discovery is documented.
-- [ ] Known limitations are documented.
-- [ ] License notice plan is documented.
+- [x] README explains setup.
+- [x] Settings/onboarding explains DeepSeek API key.
+- [x] Tester delivery instructions explain URL/key/model-only setup.
+- [x] Sidecar binary discovery is documented.
+- [x] Known limitations are documented.
+- [x] License notice plan is documented.
