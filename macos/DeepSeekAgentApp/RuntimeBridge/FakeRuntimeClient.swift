@@ -13,10 +13,10 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
     private var completedTurns = 0
     private var continuations: [String: [UUID: AsyncThrowingStream<RuntimeEvent, Error>.Continuation]] = [:]
 
-    init(projectPath: String = "/Users/local/demo-project") {
+    init(projectPath: String = "~/Projects") {
         let thread = RuntimeThread(
             id: "thread-demo",
-            title: "Fake runtime demo",
+            title: "New chat",
             projectPath: projectPath,
             updatedAt: isoNow(),
             archived: false
@@ -29,7 +29,7 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
                         id: "welcome",
                         kind: "assistant",
                         title: "DeepSeek Agent",
-                        content: "Fake runtime is ready. Send a prompt to stream a turn.",
+                        content: "Demo runtime connected.",
                         status: "completed",
                         approval: nil
                     )
@@ -40,13 +40,13 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
     }
 
     func health() async throws -> RuntimeHealth {
-        RuntimeHealth(status: "ok", mode: "fake", message: "Fake runtime connected")
+        RuntimeHealth(status: "ok", mode: "fake", message: "Demo runtime connected")
     }
 
     func runtimeInfo() async throws -> RuntimeInfo {
         RuntimeInfo(
             appVersion: "0.1.0",
-            runtimeVersion: "fake-runtime",
+            runtimeVersion: "demo-runtime",
             authRequired: false,
             mode: "fake",
             capabilities: ["threads", "turns", "events", "approvals", "usage"]
@@ -66,7 +66,7 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
         try await queue.syncAsync {
             let thread = RuntimeThread(
                 id: "thread-\(self.threads.count + 1)",
-                title: request.title?.isEmpty == false ? request.title! : "Untitled project chat",
+                title: request.title?.isEmpty == false ? request.title! : "New chat",
                 projectPath: request.projectPath,
                 updatedAt: isoNow(),
                 archived: false
@@ -112,6 +112,7 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
             ]), turnId: turnId)
             self.emitLocked(threadId: threadId, event: "item.completed", payload: .object(["itemId": .string(userItemId)]), turnId: turnId)
 
+            let projectPath = self.threads.first(where: { $0.thread.id == threadId })?.thread.projectPath ?? "~/Projects"
             let steps: [(TimeInterval, () -> Void)] = [
                 (0.10, { self.emitLocked(threadId: threadId, event: "item.started", payload: .object(["itemId": .string(assistantItemId), "kind": .string("assistant"), "title": .string("DeepSeek")]), turnId: turnId) }),
                 (0.22, { self.emitLocked(threadId: threadId, event: "item.delta", payload: .object(["itemId": .string(assistantItemId), "delta": .string("I inspected the local project context. ")]), turnId: turnId) }),
@@ -124,7 +125,7 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
                     "title": .string("Run local verification"),
                     "toolName": .string("shell"),
                     "actionType": .string("command"),
-                    "cwd": .string("/Users/local/demo-project"),
+                    "cwd": .string(projectPath),
                     "command": .string("bash scripts/dev/check.sh"),
                     "expectedSideEffect": .string("Runs local build and unit checks without modifying project files.")
                 ]), turnId: turnId) })
@@ -178,7 +179,7 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
             ]), turnId: turnId)
             self.emitLocked(threadId: record.thread.id, event: "item.delta", payload: .object([
                 "itemId": .string(assistantItemId),
-                "delta": .string(decision == "allow" ? "Approval granted. The fake check completed cleanly." : "Approval denied. I stopped before running the command.")
+                "delta": .string(decision == "allow" ? "Approval granted. The demo check completed cleanly." : "Approval denied. I stopped before running the command.")
             ]), turnId: turnId)
             self.emitLocked(threadId: record.thread.id, event: "item.completed", payload: .object(["itemId": .string(assistantItemId)]), turnId: turnId)
             self.emitLocked(threadId: record.thread.id, event: "turn.completed", payload: .object(["turnId": .string(turnId)]), turnId: turnId)

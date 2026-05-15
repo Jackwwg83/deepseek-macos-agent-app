@@ -136,7 +136,7 @@ private final class AppWebViewProbe: NSObject, WKNavigationDelegate {
           bodyText: document.body ? document.body.innerText.slice(0, 2000) : null,
           bodyHTMLLength: document.body ? document.body.innerHTML.length : -1,
           rootHTMLLength: document.getElementById("root") ? document.getElementById("root").innerHTML.length : -1,
-          containsFakeRuntimeDemo: document.body ? document.body.innerText.includes("Fake runtime demo") : false,
+          containsStarterChat: document.body ? document.body.innerText.includes("New chat") : false,
           containsBooting: document.body ? document.body.innerText.includes("BOOTING") : false,
           containsLoadingThread: document.body ? document.body.innerText.includes("Loading thread") : false,
           bodyBackground: document.body ? getComputedStyle(document.body).backgroundColor : null,

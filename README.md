@@ -30,7 +30,7 @@ Steps:
 4. In the left settings panel, enter your DeepSeek-compatible URL.
 5. Enter your API key.
 6. Choose or type the model name.
-7. Click `Save & Start Runtime`.
+7. Click `Start DeepSeek`.
 
 The API key is stored in macOS Keychain. The app starts the bundled sidecar on `127.0.0.1` with a fresh bearer token for each launch.
 
@@ -54,7 +54,7 @@ Users only need three values:
 | API key | Stored in macOS Keychain |
 | Model | `deepseek-v4-flash` |
 
-The bundled sidecar is used by default. Advanced users can override the sidecar path in the native settings panel.
+The bundled sidecar is used by default.
 
 ## What Is Included
 

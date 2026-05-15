@@ -18,26 +18,27 @@ export function Composer({ value, disabled, activeTurnId, onChange, onSubmit, on
         onSubmit();
       }}
     >
-      <textarea
-        aria-label="Prompt"
-        value={value}
-        placeholder="Ask DeepSeek to inspect, explain, or plan against this project..."
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      <div className="composer-actions">
-        {activeTurnId ? (
-          <button className="secondary-button icon-button" type="button" title="Interrupt turn" onClick={onInterrupt}>
-            <Square size={16} aria-hidden="true" />
-            Stop
+      <div className="composer-shell">
+        <textarea
+          aria-label="Prompt"
+          value={value}
+          placeholder="Ask DeepSeek to inspect, explain, or plan against this project..."
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <div className="composer-actions">
+          {activeTurnId ? (
+            <button className="secondary-button icon-button" type="button" title="Interrupt turn" onClick={onInterrupt}>
+              <Square size={16} aria-hidden="true" />
+              Stop
+            </button>
+          ) : null}
+          <button className="primary-button icon-button" type="submit" disabled={disabled || value.trim().length === 0}>
+            <Send size={16} aria-hidden="true" />
+            Send
           </button>
-        ) : null}
-        <button className="primary-button icon-button" type="submit" disabled={disabled || value.trim().length === 0}>
-          <Send size={16} aria-hidden="true" />
-          Send
-        </button>
+        </div>
       </div>
     </form>
   );
 }
-

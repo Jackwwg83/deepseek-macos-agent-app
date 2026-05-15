@@ -8,7 +8,7 @@ import { createAgentBridge } from "../../bridge/createBridge";
 import { applyRuntimeEvent, createInitialThreadState, eventSeqForReconnect, type ThreadViewState } from "../../runtime/reducer";
 import type { ApprovalDecision, RuntimeHealth, RuntimeInfo, RuntimeThread, UsageAggregation } from "../../runtime/types";
 
-const defaultProjectPath = "/Users/local/demo-project";
+const defaultProjectPath = "~/Projects";
 
 export function App() {
   const bridge = useMemo(() => createAgentBridge(), []);
@@ -19,7 +19,7 @@ export function App() {
   const [projectPath, setProjectPath] = useState(defaultProjectPath);
   const [threadState, setThreadState] = useState<ThreadViewState>(createInitialThreadState());
   const [usage, setUsage] = useState<UsageAggregation>();
-  const [prompt, setPrompt] = useState("Explain this project and show the approval flow.");
+  const [prompt, setPrompt] = useState("");
   const [error, setError] = useState<string>();
 
   useEffect(() => {
@@ -93,7 +93,7 @@ export function App() {
   }
 
   async function createThread() {
-    const thread = await bridge.createThread({ title: "New project chat", projectPath });
+    const thread = await bridge.createThread({ title: "New chat", projectPath });
     setThreads(await bridge.listThreads({ limit: 20 }));
     setSelectedThreadId(thread.id);
   }
@@ -119,6 +119,8 @@ export function App() {
     await refreshUsage();
   }
 
+  const runtimeModeLabel = info?.mode === "fake" ? "demo" : (info?.mode ?? "booting");
+
   return (
     <main className="app-shell">
       <ThreadList
@@ -137,10 +139,12 @@ export function App() {
             <p className="eyebrow">Active chat</p>
             <h2>{threadState.thread?.title ?? "Loading thread"}</h2>
           </div>
-          <span className="runtime-mode">{info?.mode ?? "booting"}</span>
+          <span className="runtime-mode">{runtimeModeLabel}</span>
         </header>
-        {error ? <div className="error-banner">{error}</div> : null}
-        <Timeline items={threadState.items} onApprovalDecision={(approvalId, decision) => void decideApproval(approvalId, decision)} />
+        <div className="conversation-area">
+          {error ? <div className="error-banner">{error}</div> : null}
+          <Timeline items={threadState.items} onApprovalDecision={(approvalId, decision) => void decideApproval(approvalId, decision)} />
+        </div>
         <Composer
           value={prompt}
           disabled={!selectedThreadId}

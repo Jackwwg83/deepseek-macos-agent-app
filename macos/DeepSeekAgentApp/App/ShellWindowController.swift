@@ -25,13 +25,13 @@ final class ShellWindowController: NSWindowController {
         self.keychainStore = keychainStore
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1280, height: 820),
+            contentRect: NSRect(x: 0, y: 0, width: 1380, height: 820),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "DeepSeek Agent"
-        window.minSize = NSSize(width: 1080, height: 640)
+        window.minSize = NSSize(width: 1120, height: 640)
         super.init(window: window)
         window.contentView = makeRootView()
         refreshStatus()
@@ -54,7 +54,7 @@ final class ShellWindowController: NSWindowController {
 
         splitView.addArrangedSubview(sidebar)
         splitView.addArrangedSubview(webView)
-        sidebar.widthAnchor.constraint(equalToConstant: 360).isActive = true
+        sidebar.widthAnchor.constraint(equalToConstant: 304).isActive = true
 
         let root = NSView()
         root.addSubview(splitView)
@@ -71,69 +71,58 @@ final class ShellWindowController: NSWindowController {
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 14
-        stack.edgeInsets = NSEdgeInsets(top: 18, left: 18, bottom: 18, right: 18)
+        stack.spacing = 10
+        stack.edgeInsets = NSEdgeInsets(top: 18, left: 16, bottom: 18, right: 16)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        let title = NSTextField(labelWithString: "DeepSeek Agent")
-        title.font = .systemFont(ofSize: 20, weight: .bold)
-
-        let subtitle = NSTextField(labelWithString: "Native shell, fake runtime ready.")
-        subtitle.textColor = .secondaryLabelColor
-
-        let projectLabel = NSTextField(labelWithString: "Project")
-        let projectPath = NSTextField(string: FileManager.default.currentDirectoryPath)
-        projectPath.placeholderString = "Choose a local project path"
-        projectPath.isEditable = true
-
-        let settingsLabel = NSTextField(labelWithString: "Settings")
-        settingsLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        let title = sidebarLabel("Connection", size: 18, weight: .bold, color: .labelColor)
+        let subtitle = sidebarLabel("URL, API key, and model", size: 12, weight: .regular, color: .secondaryLabelColor)
 
         let runtimeSettings = settingsStore.load()
         baseURLField.placeholderString = "https://api.deepseek.com/beta or https://your-endpoint/v1"
         baseURLField.stringValue = runtimeSettings.baseURL
+        configureInputField(baseURLField)
 
         modelCombo.addItems(withObjectValues: [
             "deepseek-v4-flash",
             "deepseek-v4-pro"
         ])
         modelCombo.isEditable = true
+        modelCombo.completes = true
         modelCombo.stringValue = runtimeSettings.model
+        configureInputField(modelCombo)
 
-        apiKeyField.placeholderString = "DeepSeek API key stored in Keychain"
-        let saveAndStartButton = NSButton(title: "Save & Start Runtime", target: self, action: #selector(saveAndStartRuntime))
-        let fakeRuntimeButton = NSButton(title: "Use Fake Runtime", target: self, action: #selector(useFakeRuntime))
+        apiKeyField.placeholderString = "Paste API key"
+        configureInputField(apiKeyField)
 
-        sidecarPathField.placeholderString = "Optional sidecar override; bundled binary is used by default"
+        let saveAndStartButton = NSButton(title: "Start DeepSeek", target: self, action: #selector(saveAndStartRuntime))
+        let fakeRuntimeButton = NSButton(title: "Demo Mode", target: self, action: #selector(useFakeRuntime))
+        configureActionButton(saveAndStartButton, emphasized: true)
+        configureActionButton(fakeRuntimeButton, emphasized: false)
+
+        sidecarPathField.placeholderString = "Optional sidecar binary path"
         sidecarPathField.stringValue = runtimeSettings.sidecarPath
-
-        let fakeMode = NSButton(checkboxWithTitle: "Fake runtime mode", target: nil, action: nil)
-        fakeMode.state = ProcessInfo.processInfo.environment["DEEPSEEK_AGENT_RUNTIME"] == "real" ? .off : .on
-        fakeMode.isEnabled = false
+        configureInputField(sidecarPathField)
 
         statusLabel.lineBreakMode = .byWordWrapping
-        statusLabel.maximumNumberOfLines = 4
+        statusLabel.maximumNumberOfLines = 6
+        statusLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        statusLabel.textColor = .secondaryLabelColor
 
         [
             title,
             subtitle,
             separator(),
-            projectLabel,
-            projectPath,
-            separator(),
-            settingsLabel,
-            NSTextField(labelWithString: "DeepSeek URL"),
+            formLabel("DeepSeek URL"),
             baseURLField,
-            NSTextField(labelWithString: "Model"),
+            formLabel("Model"),
             modelCombo,
-            NSTextField(labelWithString: "API Key"),
+            formLabel("API Key"),
             apiKeyField,
             saveAndStartButton,
             fakeRuntimeButton,
-            NSTextField(labelWithString: "Advanced sidecar path"),
-            sidecarPathField,
-            fakeMode,
             separator(),
+            formLabel("Status"),
             statusLabel
         ].forEach { view in
             view.translatesAutoresizingMaskIntoConstraints = false
@@ -142,6 +131,8 @@ final class ShellWindowController: NSWindowController {
         }
 
         let container = NSView()
+        container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor(calibratedRed: 0.957, green: 0.949, blue: 0.925, alpha: 1).cgColor
         container.addSubview(stack)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
@@ -152,17 +143,46 @@ final class ShellWindowController: NSWindowController {
         return container
     }
 
+    private func sidebarLabel(_ text: String, size: CGFloat, weight: NSFont.Weight, color: NSColor) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: size, weight: weight)
+        label.textColor = color
+        label.lineBreakMode = .byTruncatingTail
+        return label
+    }
+
+    private func formLabel(_ text: String) -> NSTextField {
+        sidebarLabel(text, size: 11, weight: .semibold, color: .secondaryLabelColor)
+    }
+
+    private func configureInputField(_ field: NSTextField) {
+        field.font = .systemFont(ofSize: 12)
+        field.controlSize = .regular
+        field.bezelStyle = .roundedBezel
+        field.drawsBackground = true
+        field.backgroundColor = .textBackgroundColor
+        field.heightAnchor.constraint(equalToConstant: 32).isActive = true
+    }
+
+    private func configureActionButton(_ button: NSButton, emphasized: Bool) {
+        button.bezelStyle = .rounded
+        button.controlSize = .regular
+        button.font = .systemFont(ofSize: 12, weight: emphasized ? .semibold : .regular)
+        button.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        if emphasized {
+            button.bezelColor = NSColor(calibratedRed: 0.949, green: 0.718, blue: 0.322, alpha: 1)
+        }
+    }
+
     private func refreshStatus() {
         let status = sidecarManager.status
-        let binary = sidecarManager.discoverBinary()?.path ?? "not found"
+        let binary = sidecarManager.discoverBinary() == nil ? "not found" : "available"
         let settings = settingsStore.load()
         statusLabel.stringValue = """
-        Sidecar: \(status.state)
-        Endpoint: \(settings.baseURL.isEmpty ? "not configured" : settings.baseURL)
+        Runtime: \(status.state)
+        URL: \(settings.baseURL.isEmpty ? "not set" : "saved")
         Model: \(settings.model)
-        Host: 127.0.0.1
-        Binary: \(binary)
-        Token: Swift-owned per launch
+        Sidecar: \(binary)
         """
     }
 
@@ -196,7 +216,7 @@ final class ShellWindowController: NSWindowController {
     private func startRealRuntime(settings: RuntimeSettings) throws {
         guard let apiKey = try RuntimeSecretResolver.resolveAPIKey(environment: ProcessInfo.processInfo.environment, keychainAPIKey: keychainStore.readAPIKey),
               !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw RuntimeClientError.unsupported("Enter a DeepSeek API key, then click Save & Start Runtime.")
+            throw RuntimeClientError.unsupported("Enter a DeepSeek API key, then click Start DeepSeek.")
         }
 
         guard let binary = sidecarManager.discoverBinary(userSelectedPath: settings.sidecarPath.isEmpty ? nil : settings.sidecarPath) else {
@@ -208,12 +228,10 @@ final class ShellWindowController: NSWindowController {
         runtimeClient.replace(with: DeepSeekTuiRuntimeClient(baseURL: launch.baseURL, authToken: launch.authToken))
         webView?.reload()
         statusLabel.stringValue = """
-        Sidecar: connected
-        Endpoint: \(settings.baseURL)
+        Runtime: connected
+        URL: saved
         Model: \(settings.model)
-        Host: \(launch.baseURL.host ?? "127.0.0.1"):\(launch.baseURL.port ?? 0)
-        Binary: \(binary.path)
-        Token: Swift-owned per launch
+        Local sidecar: \(launch.baseURL.host ?? "127.0.0.1"):\(launch.baseURL.port ?? 0)
         """
     }
 

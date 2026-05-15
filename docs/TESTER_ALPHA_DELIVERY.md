@@ -33,7 +33,7 @@ Steps:
 3. In the left settings panel, enter the DeepSeek URL.
 4. Enter the API key. The app saves it to macOS Keychain.
 5. Choose or type the model.
-6. Click `Save & Start Runtime`.
+6. Click `Start DeepSeek`.
 
 The app bundles `deepseek-tui`; testers do not need Rust, Node, Xcode, or a separate DeepSeek-TUI install.
 

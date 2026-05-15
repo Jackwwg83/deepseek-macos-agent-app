@@ -31,13 +31,13 @@ export class FakeAgentBridge implements AgentBridge {
   private subscribers = new Map<string, Set<Subscriber>>();
   private completedTurns = 0;
 
-  constructor(projectPath = "/Users/local/demo-project") {
+  constructor(projectPath = "~/Projects") {
     const now = new Date().toISOString();
     this.threads = [
       {
         thread: {
           id: "thread-demo",
-          title: "Fake runtime demo",
+          title: "New chat",
           projectPath,
           updatedAt: now,
         },
@@ -46,7 +46,7 @@ export class FakeAgentBridge implements AgentBridge {
             id: "welcome",
             kind: "assistant",
             title: "DeepSeek Agent",
-            content: "Fake runtime is ready. Send a prompt to stream a turn.",
+            content: "Demo runtime connected.",
             status: "completed",
           },
         ],
@@ -56,13 +56,13 @@ export class FakeAgentBridge implements AgentBridge {
   }
 
   async health(): Promise<RuntimeHealth> {
-    return { status: "ok", mode: "fake", message: "Fake runtime connected" };
+    return { status: "ok", mode: "fake", message: "Demo runtime connected" };
   }
 
   async runtimeInfo(): Promise<RuntimeInfo> {
     return {
       appVersion: "0.1.0",
-      runtimeVersion: "fake-runtime",
+      runtimeVersion: "demo-runtime",
       authRequired: false,
       mode: "fake",
       capabilities: ["threads", "turns", "events", "approvals", "usage"],
@@ -80,7 +80,7 @@ export class FakeAgentBridge implements AgentBridge {
   async createThread(req: CreateThreadRequest): Promise<RuntimeThread> {
     const thread: RuntimeThread = {
       id: `thread-${this.threads.length + 1}`,
-      title: req.title?.trim() || "Untitled project chat",
+      title: req.title?.trim() || "New chat",
       projectPath: req.projectPath,
       updatedAt: new Date().toISOString(),
     };
@@ -110,6 +110,7 @@ export class FakeAgentBridge implements AgentBridge {
     this.emit(threadId, "item.started", { itemId: userItemId, kind: "user", title: "You", content: req.input }, turnId);
     this.emit(threadId, "item.completed", { itemId: userItemId }, turnId);
 
+    const record = this.requireThread(threadId);
     const schedule = [
       () => this.emit(threadId, "item.started", { itemId: assistantItemId, kind: "assistant", title: "DeepSeek" }, turnId),
       () => this.emit(threadId, "item.delta", { itemId: assistantItemId, delta: "I inspected the local project context. " }, turnId),
@@ -132,7 +133,7 @@ export class FakeAgentBridge implements AgentBridge {
             title: "Run local verification",
             toolName: "shell",
             actionType: "command",
-            cwd: "/Users/local/demo-project",
+            cwd: record.thread.projectPath,
             command: "bash scripts/dev/check.sh",
             expectedSideEffect: "Runs local build and unit checks without modifying project files.",
           },
@@ -173,7 +174,7 @@ export class FakeAgentBridge implements AgentBridge {
     this.emit(record.thread.id, "approval.decided", { approvalId, decision }, turnId);
     this.emit(record.thread.id, "item.delta", {
       itemId: assistantItemId,
-      delta: decision === "allow" ? "Approval granted. The fake check completed cleanly." : "Approval denied. I stopped before running the command.",
+      delta: decision === "allow" ? "Approval granted. The demo check completed cleanly." : "Approval denied. I stopped before running the command.",
     }, turnId);
     this.emit(record.thread.id, "item.completed", { itemId: assistantItemId }, turnId);
     this.emit(record.thread.id, "turn.completed", { turnId }, turnId);

@@ -24,18 +24,18 @@ export function ThreadList({
         <div className="brand-mark">DS</div>
         <div>
           <h1>DeepSeek Agent</h1>
-          <p>Local macOS shell</p>
+          <p>Mac agent</p>
         </div>
       </div>
       <label className="project-picker">
         <span>
           <Folder size={15} aria-hidden="true" />
-          Project
+          Workspace
         </span>
-        <input value={projectPath} onChange={(event) => onProjectPathChange(event.target.value)} />
+        <input value={projectPath} placeholder="Local folder path" onChange={(event) => onProjectPathChange(event.target.value)} />
       </label>
       <div className="thread-header">
-        <span>Threads</span>
+        <span>Chats</span>
         <button className="ghost-button" type="button" title="New thread" onClick={onCreateThread}>
           <Plus size={16} aria-hidden="true" />
         </button>
@@ -56,4 +56,3 @@ export function ThreadList({
     </aside>
   );
 }
-

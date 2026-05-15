@@ -120,7 +120,7 @@ How to run:
    Example: https://api.deepseek.com/beta or your OpenAI-compatible /v1 endpoint.
 3. Enter your DeepSeek API key. It is saved to macOS Keychain.
 4. Choose or type the model name, for example deepseek-v4-flash.
-5. Click "Save & Start Runtime".
+5. Click "Start DeepSeek".
 
 Notes:
 - The DeepSeek-TUI runtime is bundled inside the app; testers do not need to install it separately.
