@@ -76,7 +76,7 @@ Redact:
 
 ## Licensing
 
-DeepSeek-TUI is MIT licensed in the uploaded source. OpenBridge is also MIT licensed, but this project should not copy OpenBridge code. If bundling DeepSeek-TUI binary:
+DeepSeek-TUI is MIT licensed in the uploaded source. OpenBridge is also MIT licensed, but this project does not copy OpenBridge code. The tester alpha bundles a DeepSeek-TUI binary and therefore must:
 
 - Include its license notice.
 - Document exact version.
@@ -99,6 +99,7 @@ Codex/OpenAI product names are references only. Do not use OpenAI/Codex branding
 - Show sidecar version.
 - Include license notices.
 - Not notarized unless needed.
+- Publish zip and checksum as GitHub Release assets.
 
 ### Public release
 
