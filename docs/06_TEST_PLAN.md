@@ -151,7 +151,7 @@ export DEEPSEEK_MODEL=deepseek-v4-flash
 
 Local automated coverage performs a narrow real sidecar health smoke when a binary is available: it starts `deepseek-tui serve --http` on `127.0.0.1` with a random test bearer token and verifies `GET /health`. Swift adapter tests also cover the actual DeepSeek-TUI Runtime API response shape for runtime info, threads, thread detail, start-turn `prompt` requests, and usage totals.
 
-For packaged tester builds, no environment variables should be required. Testers open `DeepSeek Agent.app`, enter their DeepSeek URL, API key, and model in the native settings sidebar, then click `Start DeepSeek`.
+For packaged tester builds, no environment variables should be required. Testers open `DeepSeek Agent.app`, enter their DeepSeek URL, API key, and model in the native settings sidebar, then click `Start DeepSeek`. Both `https://` and self-hosted `http://` endpoints are accepted; remote HTTP shows a non-blocking warning because API keys are not protected by TLS.
 
 Acceptance steps:
 

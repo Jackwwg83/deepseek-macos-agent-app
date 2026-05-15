@@ -8,7 +8,7 @@ It bundles the web UI and a `deepseek-tui` sidecar. Test users do not need to in
 
 Latest tester alpha:
 
-[DeepSeek Agent v0.1.0-alpha.1](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.1)
+[DeepSeek Agent v0.1.0-alpha.3](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.3)
 
 Download:
 
@@ -50,11 +50,13 @@ Users only need three values:
 
 | Field | Example |
 |---|---|
-| DeepSeek URL | `https://api.deepseek.com/beta` or an OpenAI-compatible `/v1` endpoint |
+| DeepSeek URL | `https://api.deepseek.com/beta`, `https://your-host/v1`, or `http://your-self-hosted-server:port/v1` |
 | API key | Stored in macOS Keychain |
 | Model | `deepseek-v4-flash` |
 
 The bundled sidecar is used by default.
+
+`https://` is recommended for any public network. `http://` is allowed for self-hosted or private-network endpoints, but the app will show a warning because the API key is sent without transport encryption.
 
 ## What Is Included
 
@@ -133,7 +135,7 @@ build/tester-alpha/DeepSeek-Agent-alpha-macos.zip.sha256
 
 ## Validation Status
 
-The `v0.1.0-alpha.1` package was validated with:
+The `v0.1.0-alpha.3` package was validated with:
 
 - `bash scripts/dev/check.sh`
 - `bash scripts/dev/verify_tester_alpha.sh`

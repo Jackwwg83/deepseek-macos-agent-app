@@ -117,13 +117,14 @@ DeepSeek Agent App alpha for macOS testers
 How to run:
 1. Open "DeepSeek Agent.app".
 2. In the left settings panel, enter your DeepSeek-compatible URL.
-   Example: https://api.deepseek.com/beta or your OpenAI-compatible /v1 endpoint.
+   Example: https://api.deepseek.com/beta, https://your-host/v1, or http://your-self-hosted-server:port/v1.
 3. Enter your DeepSeek API key. It is saved to macOS Keychain.
 4. Choose or type the model name, for example deepseek-v4-flash.
 5. Click "Start DeepSeek".
 
 Notes:
 - The DeepSeek-TUI runtime is bundled inside the app; testers do not need to install it separately.
+- HTTPS is recommended. HTTP is allowed for self-hosted or private-network endpoints, and the app shows a warning because API keys are not protected by TLS on HTTP.
 - This is an unsigned/notarization-free alpha package. If macOS blocks it after download, right-click the app and choose Open, or run:
   xattr -dr com.apple.quarantine "DeepSeek Agent.app"
 - The app binds the local runtime only to 127.0.0.1 and generates a fresh runtime bearer token per launch.

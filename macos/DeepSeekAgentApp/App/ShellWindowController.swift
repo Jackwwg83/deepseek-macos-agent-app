@@ -79,7 +79,7 @@ final class ShellWindowController: NSWindowController {
         let subtitle = sidebarLabel("URL, API key, and model", size: 12, weight: .regular, color: .secondaryLabelColor)
 
         let runtimeSettings = settingsStore.load()
-        baseURLField.placeholderString = "https://api.deepseek.com/beta or https://your-endpoint/v1"
+        baseURLField.placeholderString = "https://api.deepseek.com/beta or http://your-host:port/v1"
         baseURLField.stringValue = runtimeSettings.baseURL
         configureInputField(baseURLField)
 
@@ -178,12 +178,12 @@ final class ShellWindowController: NSWindowController {
         let status = sidecarManager.status
         let binary = sidecarManager.discoverBinary() == nil ? "not found" : "available"
         let settings = settingsStore.load()
-        statusLabel.stringValue = """
-        Runtime: \(status.state)
-        URL: \(settings.baseURL.isEmpty ? "not set" : "saved")
-        Model: \(settings.model)
-        Sidecar: \(binary)
-        """
+        statusLabel.stringValue = statusText([
+            "Runtime: \(status.state)",
+            "URL: \(settings.baseURL.isEmpty ? "not set" : "saved")",
+            "Model: \(settings.model)",
+            "Sidecar: \(binary)"
+        ], settings: settings)
     }
 
     @objc private func saveAndStartRuntime() {
@@ -227,31 +227,24 @@ final class ShellWindowController: NSWindowController {
         let launch = try sidecarManager.start(binaryURL: binary, deepSeekAPIKey: apiKey, runtimeSettings: settings)
         runtimeClient.replace(with: DeepSeekTuiRuntimeClient(baseURL: launch.baseURL, authToken: launch.authToken))
         webView?.reload()
-        statusLabel.stringValue = """
-        Runtime: connected
-        URL: saved
-        Model: \(settings.model)
-        Local sidecar: \(launch.baseURL.host ?? "127.0.0.1"):\(launch.baseURL.port ?? 0)
-        """
+        statusLabel.stringValue = statusText([
+            "Runtime: connected",
+            "URL: saved",
+            "Model: \(settings.model)",
+            "Local sidecar: \(launch.baseURL.host ?? "127.0.0.1"):\(launch.baseURL.port ?? 0)"
+        ], settings: settings)
     }
 
     private func validate(settings: RuntimeSettings) throws {
-        guard !settings.baseURL.isEmpty, let url = URL(string: settings.baseURL), let scheme = url.scheme else {
-            throw RuntimeClientError.unsupported("Enter a valid DeepSeek URL, for example https://api.deepseek.com/beta or your /v1 endpoint.")
-        }
-        if scheme != "https" && !isLocalHTTP(url: url, scheme: scheme) {
-            throw RuntimeClientError.unsupported("DeepSeek URL must use HTTPS unless it points to localhost.")
-        }
-        guard !settings.model.isEmpty else {
-            throw RuntimeClientError.unsupported("Choose or enter a DeepSeek model.")
-        }
+        try DeepSeekEndpointPolicy.validate(settings: settings)
     }
 
-    private func isLocalHTTP(url: URL, scheme: String) -> Bool {
-        guard scheme == "http", let host = url.host?.lowercased() else {
-            return false
+    private func statusText(_ lines: [String], settings: RuntimeSettings) -> String {
+        var statusLines = lines
+        if let warning = DeepSeekEndpointPolicy.transportWarning(for: settings) {
+            statusLines.append(warning)
         }
-        return host == "localhost" || host == "127.0.0.1" || host == "::1"
+        return statusLines.joined(separator: "\n")
     }
 
     private func separator() -> NSView {
