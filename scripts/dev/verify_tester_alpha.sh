@@ -72,7 +72,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
     sed -n '1,160p' "$LOG"
     exit 1
   fi
-  if [ -f "$PROBE" ] && rg -q '"containsStarterChat":true' "$PROBE" && rg -q '"rootHTMLLength":[1-9][0-9]*' "$PROBE"; then
+  if [ -f "$PROBE" ] && rg -q '"containsV2Shell":true' "$PROBE" && rg -q '"rootHTMLLength":[1-9][0-9]*' "$PROBE"; then
     APP_OK=1
     break
   fi

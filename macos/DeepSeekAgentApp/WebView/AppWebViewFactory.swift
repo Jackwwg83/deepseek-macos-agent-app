@@ -8,7 +8,11 @@ enum AppWebViewContentSource: Equatable {
 }
 
 enum AppWebViewFactory {
-    static func make(client: AgentRuntimeClient, environment: [String: String] = ProcessInfo.processInfo.environment) -> WKWebView {
+    static func make(
+        client: AgentRuntimeClient,
+        nativeActions: NativeRuntimeBridgeActions? = nil,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
@@ -17,7 +21,7 @@ enum AppWebViewFactory {
         if environment["DEEPSEEK_AGENT_DISABLE_NATIVE_BRIDGE"] == "1" {
             bridge = nil
         } else {
-            let runtimeBridge = RuntimeBridgeController(client: client)
+            let runtimeBridge = RuntimeBridgeController(client: client, nativeActions: nativeActions)
             configuration.userContentController.addScriptMessageHandler(runtimeBridge, contentWorld: .page, name: "deepseekAgent")
             bridge = runtimeBridge
         }
@@ -137,6 +141,7 @@ private final class AppWebViewProbe: NSObject, WKNavigationDelegate {
           bodyHTMLLength: document.body ? document.body.innerHTML.length : -1,
           rootHTMLLength: document.getElementById("root") ? document.getElementById("root").innerHTML.length : -1,
           containsStarterChat: document.body ? document.body.innerText.includes("New chat") : false,
+          containsV2Shell: document.body ? (document.body.innerText.includes("DeepSeek Agent") && (document.body.innerText.includes("First Run Setup") || document.body.innerText.includes("Project Command Center") || document.body.innerText.includes("Active thread"))) : false,
           containsBooting: document.body ? document.body.innerText.includes("BOOTING") : false,
           containsLoadingThread: document.body ? document.body.innerText.includes("Loading thread") : false,
           bodyBackground: document.body ? getComputedStyle(document.body).backgroundColor : null,

@@ -4,12 +4,14 @@ import WebKit
 final class RuntimeBridgeController: NSObject, WKScriptMessageHandler, WKScriptMessageHandlerWithReply {
     private weak var webView: WKWebView?
     private let client: AgentRuntimeClient
+    private let nativeActions: NativeRuntimeBridgeActions?
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private var eventTasks: [String: Task<Void, Never>] = [:]
 
-    init(client: AgentRuntimeClient) {
+    init(client: AgentRuntimeClient, nativeActions: NativeRuntimeBridgeActions? = nil) {
         self.client = client
+        self.nativeActions = nativeActions
     }
 
     func attach(to webView: WKWebView) {
@@ -59,6 +61,13 @@ final class RuntimeBridgeController: NSObject, WKScriptMessageHandler, WKScriptM
 
     private func route(_ envelope: BridgeEnvelope) async throws -> Data {
         switch envelope.method {
+        case .getRuntimeSettings:
+            return try encoder.encode(try requireNativeActions().getRuntimeSettings())
+        case .saveRuntimeSettings:
+            let payload = try requirePayload(envelope, as: SaveRuntimeSettingsPayload.self)
+            return try encoder.encode(try requireNativeActions().saveRuntimeSettings(payload))
+        case .useDemoRuntime:
+            return try encoder.encode(try requireNativeActions().useDemoRuntime())
         case .health:
             return try encoder.encode(try await client.health())
         case .runtimeInfo:
@@ -104,6 +113,13 @@ final class RuntimeBridgeController: NSObject, WKScriptMessageHandler, WKScriptM
             throw BridgeMessageError.malformed("Missing payload for \(envelope.method.rawValue).")
         }
         return try payload.decoded(as: type)
+    }
+
+    private func requireNativeActions() throws -> NativeRuntimeBridgeActions {
+        guard let nativeActions else {
+            throw RuntimeClientError.unsupported("Native runtime settings bridge is not available.")
+        }
+        return nativeActions
     }
 
     private func subscribe(threadId: String, sinceSeq: Int?) {

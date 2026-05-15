@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeepSeek Agent macOS App — UI/UX 总包 v2</title>
+  <style>
+    :root {
+      --bg1:#7FA8FF; --bg2:#B7A7FF; --bg3:#BFEAFF;
+      --window:#F8FAFF; --surface:rgba(255,255,255,.88); --line:rgba(16,24,40,.1);
+      --text:#101828; --muted:#667085; --quiet:#98A2B3; --accent:#3366FF;
+      --success:#16A34A; --danger:#DC2626; --review:#6D5DFB;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin:0; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 15% 10%, rgba(255,255,255,.46), transparent 26%),
+        radial-gradient(circle at 82% 16%, rgba(191,234,255,.75), transparent 28%),
+        linear-gradient(135deg,var(--bg1),var(--bg2) 48%,var(--bg3));
+      min-height:100vh;
+    }
+    .wrap { width:min(1180px, calc(100vw - 48px)); margin:42px auto; }
+    .hero {
+      background:rgba(248,250,255,.82); border:1px solid rgba(255,255,255,.68);
+      box-shadow:0 32px 80px rgba(15,23,42,.22); border-radius:28px; overflow:hidden;
+    }
+    .top { display:flex; gap:8px; align-items:center; padding:18px 22px; border-bottom:1px solid var(--line); backdrop-filter: blur(24px); }
+    .dot { width:13px; height:13px; border-radius:999px; display:inline-block; }
+    .red{background:#ff5f57}.yellow{background:#ffbd2e}.green{background:#28c840}
+    .brand { margin-left:20px; font-weight:650; letter-spacing:-.01em; }
+    .content { display:grid; grid-template-columns: 280px 1fr; min-height:640px; }
+    aside { padding:26px; background:rgba(239,244,255,.72); border-right:1px solid var(--line); }
+    main { padding:34px; }
+    h1 { margin:0 0 10px; font-size:34px; letter-spacing:-.035em; }
+    h2 { margin:36px 0 14px; font-size:22px; letter-spacing:-.02em; }
+    h3 { margin:22px 0 10px; font-size:16px; }
+    p { line-height:1.65; color:var(--muted); }
+    .badge { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); background:rgba(255,255,255,.75); border-radius:999px; padding:6px 10px; font-size:12px; color:var(--muted); }
+    .toc a { display:block; color:#344054; text-decoration:none; padding:10px 12px; border-radius:10px; margin:2px 0; }
+    .toc a:hover { background:rgba(51,102,255,.08); color:#1D4ED8; }
+    .card { background:var(--surface); border:1px solid var(--line); box-shadow:0 8px 24px rgba(15,23,42,.06); border-radius:18px; padding:20px; margin:16px 0; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+    .mock { margin:24px 0 36px; }
+    .mock img { width:100%; display:block; border-radius:20px; border:1px solid rgba(255,255,255,.65); box-shadow:0 24px 60px rgba(15,23,42,.20); }
+    .mock figcaption { color:var(--muted); font-size:13px; margin-top:10px; }
+    table { width:100%; border-collapse:collapse; margin:16px 0; background:rgba(255,255,255,.72); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+    th, td { padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; font-size:14px; vertical-align:top; }
+    th { color:#344054; background:rgba(246,248,252,.8); }
+    code, pre { font-family:"SF Mono",Menlo,Monaco,Consolas,monospace; }
+    pre { background:#F6F8FC; border:1px solid var(--line); border-radius:14px; padding:16px; overflow:auto; }
+    .pillrow { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0; }
+    .button { display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,.22); background:var(--accent); color:white; text-decoration:none; border-radius:12px; padding:10px 14px; box-shadow:0 8px 20px rgba(51,102,255,.22); font-weight:600; }
+    .muted { color:var(--muted); }
+    .files a { display:block; margin:8px 0; color:#1D4ED8; text-decoration:none; }
+    @media (max-width: 900px) { .content { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="top"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="brand">DeepSeek Agent UI/UX v2</span></div>
+      <div class="content">
+        <aside>
+          <div class="badge">DeepSeek-only · macOS · TUI runtime</div>
+          <h3>目录</h3>
+          <nav class="toc">
+            <a href="#summary">设计结论</a>
+            <a href="#mockups">效果图</a>
+            <a href="#screens">页面设计</a>
+            <a href="#visual">视觉系统</a>
+            <a href="#flows">核心流程</a>
+            <a href="#codex">给 Codex 的实现入口</a>
+            <a href="#files">文档文件</a>
+          </nav>
+        </aside>
+        <main>
+          <h1 id="summary">DeepSeek Agent macOS App — UI/UX 与产品交互设计总包 v2</h1>
+          <p>这版把最新的 Codex App 风格视觉方案融合进完整产品设计：轻盈蓝紫渐变、半透明侧栏、白色卡片、克制蓝色强调色、右侧 Review Inspector，以及围绕 DeepSeek-TUI runtime 的本地 agent 工作流。</p>
+          <div class="pillrow">
+            <span class="badge">Runtime: DeepSeek-TUI sidecar</span>
+            <span class="badge">Models: deepseek-v4-flash / deepseek-v4-pro</span>
+            <span class="badge">UI: macOS + WebView/React</span>
+            <span class="badge">Mode: Demo + Real Runtime</span>
+          </div>
+
+          <div class="card">
+            <h3>一句话方案</h3>
+            <p>主界面不再是 API 连接表单，而是一个 macOS Agent Command Center：左侧管理项目和线程，中间监督 DeepSeek Agent 工作，右侧 review 变更、审批动作、查看 runtime 与成本。</p>
+          </div>
+
+          <h2 id="mockups">最新效果图</h2>
+          <figure class="mock"><img src="mockups/01_active_thread_review.png" alt="Active Thread Review"/><figcaption>01 — 主界面：Active Thread + Review Inspector</figcaption></figure>
+          <figure class="mock"><img src="mockups/02_first_run_setup.png" alt="First Run Setup"/><figcaption>02 — 首次启动：DeepSeek Setup</figcaption></figure>
+          <figure class="mock"><img src="mockups/03_project_command_center.png" alt="Project Command Center"/><figcaption>03 — 项目首页：Project Command Center</figcaption></figure>
+          <figure class="mock"><img src="mockups/04_review_changes.png" alt="Review Changes"/><figcaption>04 — Review Changes：Diff、测试证据、Apply/Reject</figcaption></figure>
+          <figure class="mock"><img src="mockups/05_settings_usage.png" alt="Settings and Usage"/><figcaption>05 — Settings & Usage：DeepSeek Account、Runtime、Cost</figcaption></figure>
+
+          <h2 id="screens">页面设计</h2>
+          <div class="grid">
+            <div class="card"><h3>First Run Setup</h3><p>配置 DeepSeek API key、模型、workspace、Demo Mode，并明确 Keychain 和 runtime 状态。</p></div>
+            <div class="card"><h3>Project Command Center</h3><p>项目首页显示 active tasks、suggested prompts、recent runs、repo activity 和 runtime quick actions。</p></div>
+            <div class="card"><h3>Active Thread</h3><p>把聊天变成结构化工作流：agent summary、files changed、terminal/test cards、composer 和 review inspector。</p></div>
+            <div class="card"><h3>Review Changes</h3><p>像 PR review 一样查看 diff、测试证据、文件风险，支持 apply/reject/request tests。</p></div>
+            <div class="card"><h3>Settings & Usage</h3><p>DeepSeek-only 设置：API key、模型默认值、workspace 偏好、usage/cost/cache。</p></div>
+          </div>
+
+          <h2 id="visual">视觉系统</h2>
+          <table>
+            <tr><th>元素</th><th>规则</th></tr>
+            <tr><td>背景</td><td>蓝紫柔和渐变，不使用深黑大背景。</td></tr>
+            <tr><td>侧栏</td><td>浅色半透明，blur，选中态为低饱和蓝色。</td></tr>
+            <tr><td>卡片</td><td>白色/玻璃面、细边框、轻阴影、圆角。</td></tr>
+            <tr><td>主色</td><td>克制蓝色，避免黄色主按钮。</td></tr>
+            <tr><td>状态</td><td>成功绿、风险橙、失败红、review 紫；只用于语义。</td></tr>
+          </table>
+
+          <h2 id="flows">核心流程</h2>
+          <pre>Open App → First Run Setup → Project Command Center
+New Thread → Active Thread streaming → Approval if needed
+Turn completed → Review Changes → Apply / Reject / Request more tests
+Settings → DeepSeek account / model / runtime / cost</pre>
+
+          <h2 id="codex">给 Codex 的实现入口</h2>
+          <p>把本包复制进项目后，在 Codex 中执行：</p>
+          <pre>/goal Implement codex/CODEX_UI_GOAL_V2.md. Keep iterating until the macOS app launches, demo mode works without an API key, the main screens match the v2 visual system, and all acceptance checks in docs/08_ACCEPTANCE_CHECKLIST.md pass.</pre>
+          <p>Codex 应优先实现 FakeRuntimeAdapter 和 Demo Mode，先把 UI 跑通，再接真实 DeepSeek-TUI sidecar。</p>
+
+          <h2 id="files">文档文件</h2>
+          <div class="card files">
+            <a href="PRODUCT_UI_UX_SPEC_V2.md">PRODUCT_UI_UX_SPEC_V2.md</a>
+            <a href="docs/01_INFORMATION_ARCHITECTURE.md">docs/01_INFORMATION_ARCHITECTURE.md</a>
+            <a href="docs/02_INTERACTION_FLOWS.md">docs/02_INTERACTION_FLOWS.md</a>
+            <a href="docs/03_VISUAL_SYSTEM.md">docs/03_VISUAL_SYSTEM.md</a>
+            <a href="docs/04_COMPONENT_LIBRARY.md">docs/04_COMPONENT_LIBRARY.md</a>
+            <a href="docs/05_MENUS_AND_SHORTCUTS.md">docs/05_MENUS_AND_SHORTCUTS.md</a>
+            <a href="docs/06_RUNTIME_ADAPTER_UI_MAPPING.md">docs/06_RUNTIME_ADAPTER_UI_MAPPING.md</a>
+            <a href="docs/07_CODEX_IMPLEMENTATION_PLAN.md">docs/07_CODEX_IMPLEMENTATION_PLAN.md</a>
+            <a href="docs/08_ACCEPTANCE_CHECKLIST.md">docs/08_ACCEPTANCE_CHECKLIST.md</a>
+            <a href="codex/CODEX_UI_GOAL_V2.md">codex/CODEX_UI_GOAL_V2.md</a>
+          </div>
+        </main>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

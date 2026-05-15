@@ -1,4 +1,4 @@
-import type { AgentBridge } from "./AgentBridge";
+import type { AgentBridge, RuntimeSettingsSnapshot, SaveRuntimeSettingsRequest } from "./AgentBridge";
 import type {
   ApprovalDecision,
   ApprovalResponse,
@@ -17,6 +17,9 @@ import type {
 } from "../runtime/types";
 
 type NativeMethod =
+  | "getRuntimeSettings"
+  | "saveRuntimeSettings"
+  | "useDemoRuntime"
   | "health"
   | "runtimeInfo"
   | "listThreads"
@@ -80,6 +83,18 @@ export class WebViewAgentBridge implements AgentBridge {
 
   static isAvailable(): boolean {
     return Boolean(window.webkit?.messageHandlers?.deepseekAgent);
+  }
+
+  getRuntimeSettings(): Promise<RuntimeSettingsSnapshot> {
+    return this.request("getRuntimeSettings", {});
+  }
+
+  saveRuntimeSettings(req: SaveRuntimeSettingsRequest): Promise<RuntimeSettingsSnapshot> {
+    return this.request("saveRuntimeSettings", req);
+  }
+
+  useDemoRuntime(): Promise<RuntimeSettingsSnapshot> {
+    return this.request("useDemoRuntime", {});
   }
 
   health(): Promise<RuntimeHealth> {

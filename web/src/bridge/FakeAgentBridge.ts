@@ -1,4 +1,4 @@
-import type { AgentBridge } from "./AgentBridge";
+import type { AgentBridge, RuntimeSettingsSnapshot, SaveRuntimeSettingsRequest } from "./AgentBridge";
 import type {
   ApprovalDecision,
   ApprovalResponse,
@@ -37,22 +37,53 @@ export class FakeAgentBridge implements AgentBridge {
       {
         thread: {
           id: "thread-demo",
-          title: "New chat",
+          title: "Polish app for launch prep",
           projectPath,
           updatedAt: now,
         },
         items: [
           {
+            id: "demo-user",
+            kind: "user",
+            title: "You",
+            content:
+              "Polish the UI with new launch-ready typography, metadata, and clearer guidance across the app so the experience feels intentional and production-ready.",
+            status: "completed",
+          },
+          {
             id: "welcome",
             kind: "assistant",
             title: "DeepSeek Agent",
-            content: "Demo runtime connected.",
+            content:
+              "I inspected the local project context and prepared a launch-readiness pass. The next steps are to tighten the setup flow, review changed files, and keep the runtime state visible without making connection settings the main workspace.",
             status: "completed",
           },
         ],
         events: [],
       },
     ];
+  }
+
+  async getRuntimeSettings(): Promise<RuntimeSettingsSnapshot> {
+    return {
+      baseURL: "https://api.deepseek.com/beta",
+      model: "deepseek-v4-flash",
+      sidecarPath: "",
+      hasAPIKey: false,
+    };
+  }
+
+  async saveRuntimeSettings(req: SaveRuntimeSettingsRequest): Promise<RuntimeSettingsSnapshot> {
+    return {
+      baseURL: req.baseURL,
+      model: req.model,
+      sidecarPath: req.sidecarPath ?? "",
+      hasAPIKey: Boolean(req.apiKey?.trim()),
+    };
+  }
+
+  async useDemoRuntime(): Promise<RuntimeSettingsSnapshot> {
+    return this.getRuntimeSettings();
   }
 
   async health(): Promise<RuntimeHealth> {

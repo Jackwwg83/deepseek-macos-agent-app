@@ -40,12 +40,16 @@ final class DeepSeekTuiRuntimeClient: AgentRuntimeClient {
     func runtimeInfo() async throws -> RuntimeInfo {
         let response: RuntimeAPIInfoResponse = try await request(path: "/v1/runtime/info", method: "GET", body: Optional<Data>.none)
         return RuntimeInfo(
-            appVersion: "0.1.0-alpha",
+            appVersion: Self.appVersion,
             runtimeVersion: response.version,
             authRequired: response.authRequired,
             mode: "real",
             capabilities: ["threads", "turns", "events", "usage", "approvals"]
         )
+    }
+
+    private static var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0-alpha.5"
     }
 
     func listThreads(limit: Int?, includeArchived: Bool) async throws -> [RuntimeThread] {

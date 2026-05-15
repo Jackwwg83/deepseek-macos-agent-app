@@ -15,7 +15,24 @@ import type {
   UsageQuery,
 } from "../runtime/types";
 
+export interface RuntimeSettingsSnapshot {
+  baseURL: string;
+  model: string;
+  sidecarPath: string;
+  hasAPIKey: boolean;
+}
+
+export interface SaveRuntimeSettingsRequest {
+  baseURL: string;
+  model: string;
+  apiKey?: string;
+  sidecarPath?: string;
+}
+
 export interface AgentBridge {
+  getRuntimeSettings(): Promise<RuntimeSettingsSnapshot>;
+  saveRuntimeSettings(req: SaveRuntimeSettingsRequest): Promise<RuntimeSettingsSnapshot>;
+  useDemoRuntime(): Promise<RuntimeSettingsSnapshot>;
   health(): Promise<RuntimeHealth>;
   runtimeInfo(): Promise<RuntimeInfo>;
   listThreads(query?: ListThreadsQuery): Promise<RuntimeThread[]>;
@@ -28,4 +45,3 @@ export interface AgentBridge {
   getUsage(query?: UsageQuery): Promise<UsageAggregation>;
   subscribeEvents(threadId: string, sinceSeq: number | undefined, onEvent: (event: RuntimeEvent) => void): () => void;
 }
-

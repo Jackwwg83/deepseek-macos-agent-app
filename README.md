@@ -1,6 +1,6 @@
 # DeepSeek Agent for macOS
 
-DeepSeek Agent is a local-first macOS desktop app for running DeepSeek-TUI through a native shell and embedded chat UI.
+DeepSeek Agent is a local-first macOS desktop app for running DeepSeek-TUI through a native shell and Codex-inspired command center UI.
 
 It bundles the web UI and a `deepseek-tui` sidecar. Test users do not need to install Rust, Node, Xcode, or DeepSeek-TUI separately.
 
@@ -8,7 +8,7 @@ It bundles the web UI and a `deepseek-tui` sidecar. Test users do not need to in
 
 Latest tester alpha:
 
-[DeepSeek Agent v0.1.0-alpha.4](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.4)
+[DeepSeek Agent v0.1.0-alpha.5](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.5)
 
 Download:
 
@@ -27,10 +27,9 @@ Steps:
 1. Download `DeepSeek-Agent-alpha-macos.zip` from the release page.
 2. Unzip it.
 3. Open `DeepSeek Agent.app`.
-4. In the left settings panel, enter your DeepSeek-compatible URL.
-5. Enter your API key.
-6. Choose or type the model name.
-7. Click `Start DeepSeek`.
+4. Complete the First Run Setup screen.
+5. For Demo Mode, leave Demo Mode enabled and click `Complete Setup`; no API key is required.
+6. For real DeepSeek mode, turn Demo Mode off, enter your DeepSeek-compatible URL, API key, and model, then click `Complete Setup`.
 
 The API key is stored in macOS Keychain. The app starts the bundled sidecar on `127.0.0.1` with a fresh bearer token for each launch.
 
@@ -61,9 +60,9 @@ The bundled sidecar is used by default.
 ## What Is Included
 
 - SwiftPM/AppKit macOS app shell
-- Native settings sidebar
+- First Run Setup, Project Command Center, Active Thread, Review Changes, and Settings & Usage screens
 - API-key storage through macOS Keychain
-- WKWebView chat surface
+- WKWebView command center UI
 - React/TypeScript embedded UI
 - Fake runtime for offline UI testing
 - Real DeepSeek-TUI HTTP/SSE runtime adapter
@@ -135,7 +134,7 @@ build/tester-alpha/DeepSeek-Agent-alpha-macos.zip.sha256
 
 ## Validation Status
 
-The `v0.1.0-alpha.4` package was validated with:
+The current tester package is validated with:
 
 - `bash scripts/dev/check.sh`
 - `bash scripts/dev/verify_tester_alpha.sh`

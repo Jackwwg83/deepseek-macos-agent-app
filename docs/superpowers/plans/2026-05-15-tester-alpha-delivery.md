@@ -29,7 +29,7 @@
 - [x] Build `web/dist` and `macos/.build/debug/DeepSeekAgentApp`.
 - [x] Require an executable DeepSeek-TUI binary from `DEEPSEEK_TUI_BIN` or `../DeepSeek-TUI/target/debug/deepseek-tui`.
 - [x] Create `build/tester-alpha/DeepSeek Agent.app` with `Contents/MacOS/DeepSeekAgentApp`, `Contents/Resources/web`, `Contents/Resources/bin/deepseek-tui`, and license/notice files.
-- [x] Ensure testers configure DeepSeek URL, API key, and model inside the native settings panel without requiring terminal environment variables.
+- [x] Ensure testers configure DeepSeek URL, API key, and model inside the First Run Setup screen without requiring terminal environment variables.
 - [x] Ad-hoc sign the app if `codesign` is available.
 - [x] Create `build/tester-alpha/DeepSeek-Agent-alpha-macos.zip` and checksum files.
 

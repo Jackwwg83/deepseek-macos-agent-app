@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 APP_NAME="${DEEPSEEK_AGENT_APP_NAME:-DeepSeek Agent}"
 BUNDLE_ID="${DEEPSEEK_AGENT_BUNDLE_ID:-app.deepseek.agent}"
-VERSION="${DEEPSEEK_AGENT_VERSION:-0.1.0-alpha}"
+VERSION="${DEEPSEEK_AGENT_VERSION:-0.1.0-alpha.5}"
 BUILD_ROOT="${DEEPSEEK_AGENT_BUILD_ROOT:-$ROOT/build/tester-alpha}"
 PACKAGE_DIR="$BUILD_ROOT/DeepSeek-Agent-alpha-macos"
 APP_DIR="$PACKAGE_DIR/$APP_NAME.app"
@@ -116,11 +116,11 @@ DeepSeek Agent App alpha for macOS testers
 
 How to run:
 1. Open "DeepSeek Agent.app".
-2. In the left settings panel, enter your DeepSeek-compatible URL.
-   Example: https://api.deepseek.com/beta, https://your-host/v1, or http://your-self-hosted-server:port/v1.
-3. Enter your DeepSeek API key. It is saved to macOS Keychain.
-4. Choose or type the model name, for example deepseek-v4-flash.
-5. Click "Start DeepSeek".
+2. Complete the First Run Setup screen.
+3. To try the app without credentials, leave Demo Mode enabled and click "Complete Setup".
+4. To run real DeepSeek mode, turn Demo Mode off, enter your DeepSeek-compatible URL, API key, and model, then click "Complete Setup".
+   Example URLs: https://api.deepseek.com/beta, https://your-host/v1, or http://your-self-hosted-server:port/v1.
+5. Your API key is saved to macOS Keychain and cleared from the setup field after submit.
 
 Notes:
 - The DeepSeek-TUI runtime is bundled inside the app; testers do not need to install it separately.

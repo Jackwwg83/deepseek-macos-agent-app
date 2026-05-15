@@ -1,6 +1,9 @@
 import Foundation
 
 enum BridgeMethod: String, Codable, CaseIterable {
+    case getRuntimeSettings
+    case saveRuntimeSettings
+    case useDemoRuntime
     case health
     case runtimeInfo
     case listThreads
@@ -93,3 +96,22 @@ struct EmptyResponse: Codable, Equatable {
     var ok: Bool
 }
 
+struct RuntimeSettingsSnapshot: Codable, Equatable {
+    var baseURL: String
+    var model: String
+    var sidecarPath: String
+    var hasAPIKey: Bool
+}
+
+struct SaveRuntimeSettingsPayload: Codable, Equatable {
+    var baseURL: String
+    var model: String
+    var apiKey: String?
+    var sidecarPath: String?
+}
+
+struct NativeRuntimeBridgeActions {
+    var getRuntimeSettings: () throws -> RuntimeSettingsSnapshot
+    var saveRuntimeSettings: (SaveRuntimeSettingsPayload) throws -> RuntimeSettingsSnapshot
+    var useDemoRuntime: () throws -> RuntimeSettingsSnapshot
+}

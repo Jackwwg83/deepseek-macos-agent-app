@@ -1,0 +1,97 @@
+:root {
+  --ds-bg-wallpaper-from: #7FA8FF;
+  --ds-bg-wallpaper-mid: #B7A7FF;
+  --ds-bg-wallpaper-to: #BFEAFF;
+  --ds-bg-window: #F8FAFF;
+  --ds-bg-sidebar: rgba(239,244,255,0.78);
+
+  --ds-surface: #FFFFFF;
+  --ds-surface-subtle: #F6F8FC;
+  --ds-surface-glass: rgba(255,255,255,0.72);
+
+  --ds-text-primary: #101828;
+  --ds-text-secondary: #475467;
+  --ds-text-tertiary: #667085;
+  --ds-text-quiet: #98A2B3;
+
+  --ds-border: rgba(16,24,40,0.10);
+  --ds-border-strong: rgba(16,24,40,0.16);
+  --ds-border-accent: rgba(51,102,255,0.22);
+
+  --ds-accent: #3366FF;
+  --ds-accent-soft: #E9EFFF;
+  --ds-deepseek: #4F7CFF;
+
+  --ds-success: #16A34A;
+  --ds-warning: #F59E0B;
+  --ds-danger: #DC2626;
+  --ds-review: #6D5DFB;
+  --ds-addition-bg: #EAF8F0;
+  --ds-deletion-bg: #FDECEC;
+
+  --ds-radius-button: 10px;
+  --ds-radius-card: 14px;
+  --ds-radius-panel: 18px;
+  --ds-radius-window: 24px;
+
+  --ds-space-xs: 4px;
+  --ds-space-sm: 8px;
+  --ds-space-md: 12px;
+  --ds-space-lg: 16px;
+  --ds-space-xl: 24px;
+  --ds-space-page: 32px;
+
+  --ds-shadow-window: 0 32px 80px rgba(15, 23, 42, 0.24);
+  --ds-shadow-card: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --ds-shadow-popover: 0 18px 44px rgba(15, 23, 42, 0.16);
+
+  --ds-sidebar-width: 336px;
+  --ds-inspector-width: 360px;
+
+  --ds-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  --ds-font-mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+}
+
+.deepseek-wallpaper {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 10% 15%, rgba(255,255,255,0.45), transparent 28%),
+    radial-gradient(circle at 80% 10%, rgba(191,234,255,0.70), transparent 30%),
+    linear-gradient(135deg, var(--ds-bg-wallpaper-from), var(--ds-bg-wallpaper-mid) 45%, var(--ds-bg-wallpaper-to));
+  font-family: var(--ds-font-ui);
+  color: var(--ds-text-primary);
+}
+
+.deepseek-window {
+  background: var(--ds-bg-window);
+  border: 1px solid rgba(255,255,255,0.65);
+  border-radius: var(--ds-radius-window);
+  box-shadow: var(--ds-shadow-window);
+  overflow: hidden;
+}
+
+.deepseek-sidebar {
+  background: var(--ds-bg-sidebar);
+  backdrop-filter: blur(24px);
+  border-right: 1px solid var(--ds-border);
+}
+
+.deepseek-card {
+  background: rgba(255,255,255,0.86);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-card);
+  box-shadow: var(--ds-shadow-card);
+}
+
+.deepseek-button-primary {
+  background: var(--ds-accent);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: var(--ds-radius-button);
+  box-shadow: 0 8px 20px rgba(51,102,255,0.22);
+}
+
+.deepseek-selection {
+  background: rgba(51,102,255,0.08);
+  border-color: rgba(51,102,255,0.14);
+}

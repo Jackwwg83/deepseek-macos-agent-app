@@ -30,10 +30,10 @@ Steps:
 
 1. Unzip `DeepSeek-Agent-alpha-macos.zip`.
 2. Open `DeepSeek Agent.app`.
-3. In the left settings panel, enter the DeepSeek URL.
-4. Enter the API key. The app saves it to macOS Keychain.
-5. Choose or type the model.
-6. Click `Start DeepSeek`.
+3. Complete the First Run Setup screen.
+4. To explore without credentials, leave Demo Mode enabled and click `Complete Setup`.
+5. To run real DeepSeek mode, turn Demo Mode off, enter the DeepSeek URL, API key, and model, then click `Complete Setup`.
+6. The app saves the API key to macOS Keychain and clears the setup field after submit.
 
 The app bundles `deepseek-tui`; testers do not need Rust, Node, Xcode, or a separate DeepSeek-TUI install.
 

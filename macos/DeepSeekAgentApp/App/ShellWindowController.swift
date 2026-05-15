@@ -26,13 +26,17 @@ final class ShellWindowController: NSWindowController {
         self.keychainStore = keychainStore
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1380, height: 820),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            contentRect: NSRect(x: 0, y: 0, width: 1536, height: 960),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "DeepSeek Agent"
-        window.minSize = NSSize(width: 1120, height: 640)
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
+        window.backgroundColor = .clear
+        window.minSize = NSSize(width: 1180, height: 720)
         super.init(window: window)
         window.contentView = makeRootView()
         refreshStatus()
@@ -43,29 +47,38 @@ final class ShellWindowController: NSWindowController {
     }
 
     private func makeRootView() -> NSView {
-        let splitView = NSSplitView()
-        splitView.isVertical = true
-        splitView.dividerStyle = .thin
-        splitView.translatesAutoresizingMaskIntoConstraints = false
-
-        let sidebar = makeSidebar()
-        let webView = AppWebViewFactory.make(client: runtimeClient)
+        let webView = AppWebViewFactory.make(client: runtimeClient, nativeActions: makeNativeBridgeActions())
         self.webView = webView
         webView.translatesAutoresizingMaskIntoConstraints = false
 
-        splitView.addArrangedSubview(sidebar)
-        splitView.addArrangedSubview(webView)
-        sidebar.widthAnchor.constraint(equalToConstant: 304).isActive = true
-
         let root = NSView()
-        root.addSubview(splitView)
+        root.wantsLayer = true
+        root.layer?.backgroundColor = NSColor.clear.cgColor
+        root.addSubview(webView)
         NSLayoutConstraint.activate([
-            splitView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            splitView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            splitView.topAnchor.constraint(equalTo: root.topAnchor),
-            splitView.bottomAnchor.constraint(equalTo: root.bottomAnchor)
+            webView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            webView.topAnchor.constraint(equalTo: root.topAnchor),
+            webView.bottomAnchor.constraint(equalTo: root.bottomAnchor)
         ])
         return root
+    }
+
+    private func makeNativeBridgeActions() -> NativeRuntimeBridgeActions {
+        NativeRuntimeBridgeActions(
+            getRuntimeSettings: { [weak self] in
+                guard let self else { throw RuntimeClientError.unsupported("Window is no longer available.") }
+                return try self.runtimeSettingsSnapshot()
+            },
+            saveRuntimeSettings: { [weak self] payload in
+                guard let self else { throw RuntimeClientError.unsupported("Window is no longer available.") }
+                return try self.saveRuntimeSettingsFromWeb(payload)
+            },
+            useDemoRuntime: { [weak self] in
+                guard let self else { throw RuntimeClientError.unsupported("Window is no longer available.") }
+                return try self.useDemoRuntimeFromWeb()
+            }
+        )
     }
 
     private func makeSidebar() -> NSView {
@@ -208,11 +221,86 @@ final class ShellWindowController: NSWindowController {
     }
 
     @objc private func useFakeRuntime() {
+        switchToFakeRuntime(reloadWebView: true)
+    }
+
+    @objc func newThreadMenu(_ sender: Any?) {
+        dispatchWebCommand("newThread")
+    }
+
+    @objc func commandPaletteMenu(_ sender: Any?) {
+        dispatchWebCommand("commandPalette")
+    }
+
+    @objc func settingsMenu(_ sender: Any?) {
+        dispatchWebCommand("settings")
+    }
+
+    @objc func reviewMenu(_ sender: Any?) {
+        dispatchWebCommand("review")
+    }
+
+    @objc func stopCurrentTurnMenu(_ sender: Any?) {
+        dispatchWebCommand("stopTurn")
+    }
+
+    @objc func demoRuntimeMenu(_ sender: Any?) {
+        switchToFakeRuntime(reloadWebView: false)
+        dispatchWebCommand("demoRuntime")
+    }
+
+    private func dispatchWebCommand(_ command: String) {
+        guard let data = try? JSONEncoder().encode(["command": command]),
+              let json = String(data: data, encoding: .utf8) else {
+            return
+        }
+        webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('deepseek:native-command', { detail: \(json) }));")
+    }
+
+    private func switchToFakeRuntime(reloadWebView: Bool) {
         runtimeStartupGeneration += 1
         sidecarManager.stop()
         runtimeClient.replace(with: FakeRuntimeClient(projectPath: FileManager.default.currentDirectoryPath))
-        webView?.reload()
+        if reloadWebView {
+            webView?.reload()
+        }
         refreshStatus()
+    }
+
+    private func runtimeSettingsSnapshot() throws -> RuntimeSettingsSnapshot {
+        let settings = settingsStore.load()
+        let apiKey = try RuntimeSecretResolver.resolveAPIKey(
+            environment: ProcessInfo.processInfo.environment,
+            keychainAPIKey: keychainStore.readAPIKey
+        )
+        return RuntimeSettingsSnapshot(
+            baseURL: settings.baseURL,
+            model: settings.model,
+            sidecarPath: settings.sidecarPath,
+            hasAPIKey: !(apiKey ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        )
+    }
+
+    private func saveRuntimeSettingsFromWeb(_ payload: SaveRuntimeSettingsPayload) throws -> RuntimeSettingsSnapshot {
+        let current = settingsStore.load()
+        let settings = RuntimeSettings(
+            baseURL: payload.baseURL,
+            model: payload.model,
+            sidecarPath: payload.sidecarPath ?? current.sidecarPath
+        ).normalized
+        try validate(settings: settings)
+
+        if let apiKey = payload.apiKey?.trimmingCharacters(in: .whitespacesAndNewlines), !apiKey.isEmpty {
+            try keychainStore.saveAPIKey(apiKey)
+        }
+        settingsStore.save(settings)
+        try startRealRuntime(settings: settings)
+        return try runtimeSettingsSnapshot()
+    }
+
+    private func useDemoRuntimeFromWeb() throws -> RuntimeSettingsSnapshot {
+        switchToFakeRuntime(reloadWebView: false)
+        return try runtimeSettingsSnapshot()
     }
 
     private func startRealRuntime(settings: RuntimeSettings) throws {
