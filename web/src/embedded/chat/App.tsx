@@ -40,34 +40,30 @@ function initialPreviewView(): AppView {
   return value && previewViews.has(value) ? value : "setup";
 }
 
-const projects = [
-  { name: "recipe-app", folders: ["app", "components", "hooks", "utils"] },
-  { name: "photobooth", folders: [] },
-  { name: "wanderlust", folders: [] },
-  { name: "agent-tools-samples", folders: [] },
-  { name: "game-experiment", folders: [] },
+const demoProjects = [
+  { name: "Demo workspace", folders: ["src", "tests", "docs", "scripts"] },
 ];
 
 const changedFiles = [
-  { path: "app/components/PromptDialog.test.tsx", additions: 122, deletions: 8, status: "selected" },
-  { path: "app/components/RootHeader.test.tsx", additions: 55, deletions: 2, status: "selected" },
-  { path: "app/screens/ArchiveView.tsx", additions: 214, deletions: 21, status: "review" },
-  { path: "app/styles/tokens.ts", additions: 64, deletions: 0, status: "reviewed" },
-  { path: "app/lib/analytics.ts", additions: 42, deletions: 3, status: "reviewed" },
+  { path: "src/agent/RuntimeBridge.ts", additions: 38, deletions: 4, status: "selected" },
+  { path: "src/ui/SetupFlow.tsx", additions: 64, deletions: 6, status: "selected" },
+  { path: "src/ui/ReviewPanel.tsx", additions: 41, deletions: 3, status: "review" },
+  { path: "tests/runtime-bridge.test.ts", additions: 27, deletions: 0, status: "reviewed" },
+  { path: "docs/test-plan.md", additions: 22, deletions: 0, status: "reviewed" },
 ];
 
 const recentRuns = [
-  ["Run #24", "Polish UI and flows for launch", "28.4s", "Completed"],
-  ["Run #23", "Add search filters and results UI", "41.2s", "Completed"],
-  ["Run #22", "Refactor caching and data layer", "32.7s", "Completed"],
-  ["Run #21", "Fix ingredient parsing edge cases", "18.6s", "Completed"],
+  ["Run #04", "Inspect workspace and summarize launch risks", "21.6s", "Completed"],
+  ["Run #03", "Prepare focused verification checklist", "18.9s", "Completed"],
+  ["Run #02", "Review runtime setup flow", "24.1s", "Completed"],
+  ["Run #01", "Create first local agent thread", "12.4s", "Completed"],
 ];
 
 const suggestedPrompts = [
-  ["Add unit tests for RecipeService", "Generate tests for services/recipe.ts"],
-  ["Improve accessibility in RecipeCard", "Audit and fix a11y issues in components"],
-  ["Add dark mode support", "Implement theme switcher and tokens"],
-  ["Optimize image loading", "Lazy load images and add placeholders"],
+  ["Inspect this workspace", "Summarize structure, risks, and next useful commands"],
+  ["Plan a focused cleanup", "Create a small implementation plan with verification steps"],
+  ["Review pending changes", "Explain changed files and likely test coverage gaps"],
+  ["Prepare a tester handoff", "Draft concise install and smoke-test instructions"],
 ];
 
 const setupDefaults = {
@@ -76,6 +72,20 @@ const setupDefaults = {
   workspace: "~/DeepSeekAgent",
 };
 
+function workspaceNameFromPath(path: string): string {
+  const trimmed = path.trim().replace(/\/+$/, "");
+  if (!trimmed) {
+    return "Workspace";
+  }
+  const parts = trimmed.split(/[\\/]/).filter(Boolean);
+  const lastPart = parts[parts.length - 1] ?? trimmed;
+  return lastPart === "~" ? "Home" : lastPart;
+}
+
+function isDemoRuntime(info?: RuntimeInfo): boolean {
+  return info?.mode !== "real";
+}
+
 export function App() {
   const bridge = useMemo(() => createAgentBridge(), []);
   const initialView = useMemo(() => initialPreviewView(), []);
@@ -83,7 +93,7 @@ export function App() {
   const [info, setInfo] = useState<RuntimeInfo>();
   const [threads, setThreads] = useState<RuntimeThread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string>();
-  const [projectPath, setProjectPath] = useState("~/Projects/recipe-app");
+  const [projectPath, setProjectPath] = useState(setupDefaults.workspace);
   const [threadState, setThreadState] = useState<ThreadViewState>(createInitialThreadState());
   const [usage, setUsage] = useState<UsageAggregation>();
   const [prompt, setPrompt] = useState("");
@@ -96,7 +106,7 @@ export function App() {
   const [workspace, setWorkspace] = useState(setupDefaults.workspace);
   const [demoMode, setDemoMode] = useState(true);
   const [reviewMode, setReviewMode] = useState<"split" | "unified">("split");
-  const [reviewedFiles, setReviewedFiles] = useState(new Set(["app/styles/tokens.ts", "app/lib/analytics.ts"]));
+  const [reviewedFiles, setReviewedFiles] = useState(new Set(["tests/runtime-bridge.test.ts", "docs/test-plan.md"]));
   const [actionNote, setActionNote] = useState<string>();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
@@ -328,8 +338,11 @@ export function App() {
     return () => window.removeEventListener("keydown", handleKeyboard);
   });
 
+  const demoRuntime = isDemoRuntime(info);
   const runtimeModeLabel = info?.mode === "fake" ? "demo" : (info?.mode ?? "booting");
-  const activeThreadTitle = threadState.thread?.title ?? "Polish app for launch prep";
+  const workspaceName = demoRuntime ? "Demo workspace" : workspaceNameFromPath(projectPath);
+  const projectTree = demoRuntime ? demoProjects : [{ name: workspaceName, folders: [] }];
+  const activeThreadTitle = threadState.thread?.title ?? (demoRuntime ? "Explore DeepSeek Agent" : "New thread");
 
   return (
     <div className="deepseek-wallpaper">
@@ -354,8 +367,10 @@ export function App() {
           <>
             <LeftNavigation
               threads={threads}
+              activeProjectName={workspaceName}
               selectedThreadId={selectedThreadId}
               currentView={view}
+              projects={projectTree}
               onCreateThread={() => void createThread()}
               onSelectThread={selectThread}
               onShowProject={() => setView("project")}
@@ -374,11 +389,12 @@ export function App() {
                 </div>
               ) : null}
               {view === "project" ? (
-                <ProjectCommandCenter model={model} onCreateThread={() => void createThread()} onShowReview={() => setView("review")} />
+                <ProjectCommandCenter isDemo={demoRuntime} model={model} projectName={workspaceName} onCreateThread={() => void createThread()} onShowReview={() => setView("review")} />
               ) : null}
               {view === "thread" ? (
                 <ActiveThread
                   activeTurnId={threadState.activeTurnId}
+                  isDemo={demoRuntime}
                   model={model}
                   prompt={prompt}
                   runtimeModeLabel={runtimeModeLabel}
@@ -393,6 +409,7 @@ export function App() {
               ) : null}
               {view === "review" ? (
                 <ReviewChanges
+                  isDemo={demoRuntime}
                   mode={reviewMode}
                   reviewedFiles={reviewedFiles}
                   threadTitle={activeThreadTitle}
@@ -417,6 +434,7 @@ export function App() {
             </section>
             <RightInspector
               view={view}
+              isDemo={demoRuntime}
               health={health}
               info={info}
               usage={usage}
@@ -561,7 +579,7 @@ function SetupScreen({
         <SetupRow index="4" icon={<Folder size={21} />} title="Choose workspace folder" description="This is where your projects and agent data will live.">
           <input className="field-input" value={workspace} onChange={(event) => onWorkspaceChange(event.target.value)} />
         </SetupRow>
-        <SetupRow index="5" icon={<Sparkles size={21} />} title="Enable Demo Mode" description="Explore the app with a fake runtime and no API key.">
+        <SetupRow index="5" icon={<Sparkles size={21} />} title="Enable Demo Mode" description="Explore the app with a local demo runtime and no API key.">
           <button className={demoMode ? "toggle on" : "toggle"} type="button" onClick={() => onDemoModeChange(!demoMode)} aria-pressed={demoMode}>
             <span />
           </button>
@@ -583,21 +601,25 @@ function SetupScreen({
 }
 
 function LeftNavigation({
+  activeProjectName,
   currentView,
   onCreateThread,
   onSelectThread,
   onShowProject,
   onShowReview,
   onShowSettings,
+  projects,
   selectedThreadId,
   threads,
 }: {
+  activeProjectName: string;
   currentView: AppView;
   onCreateThread(): void;
   onSelectThread(id: string): void;
   onShowProject(): void;
   onShowReview(): void;
   onShowSettings(): void;
+  projects: Array<{ name: string; folders: string[] }>;
   selectedThreadId?: string;
   threads: RuntimeThread[];
 }) {
@@ -620,17 +642,16 @@ function LeftNavigation({
       <div className="sidebar-section">
         <p className="sidebar-label">Recent threads</p>
         <div className="thread-list">
-          {threads.map((thread, index) => (
-            <button key={thread.id} className={thread.id === selectedThreadId && currentView === "thread" ? "thread-button active" : "thread-button"} type="button" onClick={() => onSelectThread(thread.id)}>
-              <span>{thread.title}</span>
-              <time>{index === 0 ? "12m" : `${index}d`}</time>
-            </button>
-          ))}
-          <button className="thread-button subtle" type="button">
-            <span>Add drag and drop to gallery</span>
-            <time>1d</time>
-          </button>
-          <button className="more-button" type="button">...</button>
+          {threads.length > 0 ? (
+            threads.map((thread, index) => (
+              <button key={thread.id} className={thread.id === selectedThreadId && currentView === "thread" ? "thread-button active" : "thread-button"} type="button" onClick={() => onSelectThread(thread.id)}>
+                <span>{thread.title}</span>
+                <time>{index === 0 ? "now" : `${index}d`}</time>
+              </button>
+            ))
+          ) : (
+            <p className="empty-state compact">No recent threads yet.</p>
+          )}
         </div>
       </div>
       <div className="sidebar-section projects-section">
@@ -643,7 +664,7 @@ function LeftNavigation({
         <div className="project-tree">
           {projects.map((project) => (
             <div key={project.name}>
-              <button className={project.name === "recipe-app" ? "project-button active" : "project-button"} type="button" onClick={onShowProject}>
+              <button className={project.name === activeProjectName ? "project-button active" : "project-button"} type="button" onClick={onShowProject}>
                 <Folder size={16} aria-hidden="true" />
                 {project.name}
               </button>
@@ -671,10 +692,22 @@ function LeftNavigation({
   );
 }
 
-function ProjectCommandCenter({ model, onCreateThread, onShowReview }: { model: string; onCreateThread(): void; onShowReview(): void }) {
+function ProjectCommandCenter({
+  isDemo,
+  model,
+  onCreateThread,
+  onShowReview,
+  projectName,
+}: {
+  isDemo: boolean;
+  model: string;
+  onCreateThread(): void;
+  onShowReview(): void;
+  projectName: string;
+}) {
   return (
     <div className="page project-page">
-      <PageHeader eyebrow="Project" title="Project Command Center" subtitle="recipe-app">
+      <PageHeader eyebrow="Project" title="Project Command Center" subtitle={projectName}>
         <button className="secondary-button" type="button">
           <Code2 size={16} aria-hidden="true" />
           Open in IDE
@@ -686,43 +719,49 @@ function ProjectCommandCenter({ model, onCreateThread, onShowReview }: { model: 
       <Card className="overview-card">
         <div>
           <h3>Overview</h3>
-          <p>Your AI-native command center for building and shipping faster.</p>
+          <p>{isDemo ? "Demo Mode uses local sample activity so testers can explore without an API key." : "Start a thread to inspect, edit, test, and review this workspace."}</p>
         </div>
         <div className="stats-row">
-          <Metric icon={<Clock3 size={17} />} label="Active tasks" value="3" />
-          <Metric icon={<Bot size={17} />} label="Agent runs" value="24" />
-          <Metric icon={<TestTube2 size={17} />} label="Tests passing" value="241 /256" />
-          <Metric icon={<Gauge size={17} />} label="Coverage" value="87%" />
-          <Metric icon={<Activity size={17} />} label="Last sync" value="9:41 AM" />
+          <Metric icon={<Clock3 size={17} />} label="Active tasks" value={isDemo ? "2" : "0"} />
+          <Metric icon={<Bot size={17} />} label="Agent runs" value={isDemo ? "4" : "0"} />
+          <Metric icon={<TestTube2 size={17} />} label="Checks" value={isDemo ? "Ready" : "Not run"} />
+          <Metric icon={<Gauge size={17} />} label="Review queue" value={isDemo ? "5 files" : "Empty"} />
+          <Metric icon={<Activity size={17} />} label="Last sync" value={isDemo ? "now" : "waiting"} />
         </div>
       </Card>
       <div className="dashboard-grid">
         <Card title="Active tasks">
-          <TaskList />
-          <CardLink label="View all tasks" />
+          <TaskList isDemo={isDemo} />
+          {isDemo ? <CardLink label="View all tasks" /> : null}
         </Card>
         <Card title="Suggested prompts">
           <PromptList onCreateThread={onCreateThread} />
           <CardLink label="See more prompts" />
         </Card>
         <Card title="Recent agent runs">
-          <table className="runs-table">
-            <tbody>
-              {recentRuns.map(([run, summary, duration, status]) => (
-                <tr key={run}>
-                  <td>{run}</td>
-                  <td>{summary}</td>
-                  <td>{duration}</td>
-                  <td className="positive">{status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <CardLink label="View all runs" />
+          {isDemo ? (
+            <>
+              <table className="runs-table">
+                <tbody>
+                  {recentRuns.map(([run, summary, duration, status]) => (
+                    <tr key={run}>
+                      <td>{run}</td>
+                      <td>{summary}</td>
+                      <td>{duration}</td>
+                      <td className="positive">{status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <CardLink label="View all runs" />
+            </>
+          ) : (
+            <p className="empty-state">No agent runs yet.</p>
+          )}
         </Card>
         <Card title="Repository activity">
-          <ActivityList />
-          <CardLink label="View full activity" onClick={onShowReview} />
+          <ActivityList isDemo={isDemo} />
+          {isDemo ? <CardLink label="View full activity" onClick={onShowReview} /> : null}
         </Card>
       </div>
       <div className="model-chip">
@@ -736,6 +775,7 @@ function ProjectCommandCenter({ model, onCreateThread, onShowReview }: { model: 
 
 function ActiveThread({
   activeTurnId,
+  isDemo,
   model,
   onApprovalDecision,
   onInterrupt,
@@ -748,6 +788,7 @@ function ActiveThread({
   timelineItems,
 }: {
   activeTurnId?: string;
+  isDemo: boolean;
   model: string;
   onApprovalDecision(approvalId: string, decision: ApprovalDecision): void;
   onInterrupt(): void;
@@ -759,7 +800,7 @@ function ActiveThread({
   threadTitle: string;
   timelineItems: TimelineItem[];
 }) {
-  const items = timelineItems.length > 0 ? timelineItems : fallbackTimeline;
+  const items = timelineItems.length > 0 ? timelineItems : (isDemo ? fallbackTimeline : []);
   return (
     <div className="page thread-page">
       <PageHeader eyebrow="Active thread" title={threadTitle}>
@@ -769,11 +810,17 @@ function ActiveThread({
         </button>
       </PageHeader>
       <div className="timeline-v2">
-        {items.map((item) => (
-          <TimelineCard key={item.id} item={item} onApprovalDecision={onApprovalDecision} />
-        ))}
-        <FilesChangedCard onOpenReview={onShowReview} />
-        <TerminalEvidenceCard />
+        {items.length > 0 ? (
+          items.map((item) => (
+            <TimelineCard key={item.id} item={item} onApprovalDecision={onApprovalDecision} />
+          ))
+        ) : (
+          <Card className="timeline-card-v2">
+            <p className="empty-state">No messages yet. Ask DeepSeek to inspect, explain, or plan against this workspace.</p>
+          </Card>
+        )}
+        {isDemo ? <FilesChangedCard onOpenReview={onShowReview} /> : null}
+        {isDemo ? <TerminalEvidenceCard /> : null}
       </div>
       <ComposerV2 activeTurnId={activeTurnId} model={model} prompt={prompt} onChange={onPromptChange} onInterrupt={onInterrupt} onSend={onSend} />
     </div>
@@ -781,6 +828,7 @@ function ActiveThread({
 }
 
 function ReviewChanges({
+  isDemo,
   mode,
   onAction,
   onMarkReviewed,
@@ -788,6 +836,7 @@ function ReviewChanges({
   reviewedFiles,
   threadTitle,
 }: {
+  isDemo: boolean;
   mode: "split" | "unified";
   onAction(message: string): void;
   onMarkReviewed(path: string): void;
@@ -806,8 +855,8 @@ function ReviewChanges({
       <Card className="diff-card">
         <div className="diff-header">
           <div>
-            <h3>app/components/PromptDialog.test.tsx</h3>
-            <p><span className="positive">+122 additions</span> <span className="negative">-8 deletions</span> 8 files changed</p>
+            <h3>{isDemo ? "src/ui/SetupFlow.tsx" : "No file selected"}</h3>
+            <p>{isDemo ? <><span className="positive">+64 additions</span> <span className="negative">-6 deletions</span> 5 files changed</> : "Start an agent turn to populate the review queue."}</p>
           </div>
           <div className="segmented">
             <button className={mode === "split" ? "active" : ""} type="button" onClick={() => onModeChange("split")}>Split</button>
@@ -815,34 +864,38 @@ function ReviewChanges({
           </div>
         </div>
         <div className="diff-body" data-mode={mode}>
-          <div className="code-line muted"><span>24</span><span>it('sends prompt and closes dialog', async () =&gt; &#123;</span></div>
-          <div className="code-line muted"><span>25</span><span>const user = userEvent.setup();</span></div>
-          <div className="code-line delete"><span>27</span><span>- await user.type(screen.getByPlaceholderText(/what are you looking for/i), 'sunset');</span></div>
-          <div className="code-line add"><span>27</span><span>+ const input = screen.getByPlaceholderText(/what are you looking for/i);</span></div>
-          <div className="code-line add"><span>28</span><span>+ await user.type(input, 'sunset over mountains');</span></div>
-          <div className="code-line muted"><span>29</span><span>await user.click(screen.getByRole('button', &#123; name: /send/i &#125;));</span></div>
-          <div className="code-line muted"><span>32</span><span>expect(mockOnSend).toHaveBeenCalledWith('sunset over mountains');</span></div>
+          {isDemo ? (
+            <>
+              <div className="code-line muted"><span>42</span><span>function completeSetup(settings: RuntimeSettings) &#123;</span></div>
+              <div className="code-line delete"><span>43</span><span>- return startRuntime(settings);</span></div>
+              <div className="code-line add"><span>43</span><span>+ const checked = validateEndpoint(settings.baseURL);</span></div>
+              <div className="code-line add"><span>44</span><span>+ return startRuntime(&#123; ...settings, baseURL: checked &#125;);</span></div>
+              <div className="code-line muted"><span>45</span><span>&#125;</span></div>
+            </>
+          ) : (
+            <p className="empty-state">No generated diff is available yet.</p>
+          )}
         </div>
         <div className="diff-related">
-          <FilesChangedTable reviewedFiles={reviewedFiles} onMarkReviewed={onMarkReviewed} />
+          {isDemo ? <FilesChangedTable reviewedFiles={reviewedFiles} onMarkReviewed={onMarkReviewed} /> : <p className="empty-state">No changed files yet.</p>}
           <Card className="impact-card">
             <dl>
-              <div><dt>Change type</dt><dd>Test improvement</dd></div>
-              <div><dt>Risk level</dt><dd><span className="pill low">Low</span></dd></div>
-              <div><dt>Estimated impact</dt><dd>Tests only</dd></div>
+              <div><dt>Change type</dt><dd>{isDemo ? "Runtime setup" : "None"}</dd></div>
+              <div><dt>Risk level</dt><dd><span className="pill low">{isDemo ? "Low" : "None"}</span></dd></div>
+              <div><dt>Estimated impact</dt><dd>{isDemo ? "Local setup only" : "Waiting for changes"}</dd></div>
             </dl>
-            <p>Improves test reliability and assertion coverage.</p>
+            <p>{isDemo ? "Demo review data shows how approvals, diffs, and verification evidence will appear." : "Start a DeepSeek turn to review generated changes."}</p>
           </Card>
         </div>
       </Card>
       <div className="review-bottom-grid">
-        <TerminalEvidenceCard compact />
+        {isDemo ? <TerminalEvidenceCard compact /> : <Card><p className="empty-state">No terminal evidence yet.</p></Card>}
         <Card title="DeepSeek Agent">
-          <p>This change makes the test more resilient by typing into the input element in two steps and asserting the exact value sent.</p>
+          <p>{isDemo ? "The selected setup change validates the endpoint before starting the runtime and keeps the API key in native storage." : "No review summary is available until DeepSeek produces changes."}</p>
           <ul className="check-list">
-            <li>Consistent with existing patterns</li>
-            <li>No functional changes</li>
-            <li>Improves test reliability</li>
+            <li>Consistent with local runtime flow</li>
+            <li>No workspace files changed in Demo Mode</li>
+            <li>Ready for tester smoke checks</li>
           </ul>
         </Card>
       </div>
@@ -881,7 +934,7 @@ function SettingsUsage({
           <span className="avatar">DS</span>
           <div>
             <strong>DeepSeek</strong>
-            <p>deepseek@example.com</p>
+            <p>{info?.mode === "real" ? "Connected endpoint" : "Demo Mode"}</p>
             <small>{baseURL}</small>
           </div>
           <button className="secondary-button" type="button" onClick={() => onAction("Account management is ready for native settings wiring.")}>Manage account</button>
@@ -962,10 +1015,10 @@ function SettingsUsage({
           <button type="button">Cache</button>
         </div>
         <div className="usage-metrics">
-          <MetricSmall label="Total tokens" value="12.45M" delta="+18.2%" />
-          <MetricSmall label="Input tokens" value="7.31M" delta="+16.4%" />
-          <MetricSmall label="Output tokens" value="5.14M" delta="+20.1%" />
-          <MetricSmall label="Cache hit ratio" value="82.6%" delta="+6.3pp" />
+          <MetricSmall label="Total tokens" value={((usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0)).toLocaleString()} delta="current runtime" />
+          <MetricSmall label="Input tokens" value={(usage?.inputTokens ?? 0).toLocaleString()} delta="current runtime" />
+          <MetricSmall label="Output tokens" value={(usage?.outputTokens ?? 0).toLocaleString()} delta="current runtime" />
+          <MetricSmall label="Completed turns" value={(usage?.completedTurns ?? 0).toLocaleString()} delta="current runtime" />
         </div>
         <UsageChart />
       </Card>
@@ -981,6 +1034,7 @@ function SettingsUsage({
 function RightInspector({
   health,
   info,
+  isDemo,
   model,
   onAction,
   onCreateThread,
@@ -991,6 +1045,7 @@ function RightInspector({
 }: {
   health?: RuntimeHealth;
   info?: RuntimeInfo;
+  isDemo: boolean;
   model: string;
   onAction(message: string): void;
   onCreateThread(): void;
@@ -1018,7 +1073,8 @@ function RightInspector({
   }
 
   if (view === "review") {
-    const reviewed = reviewedFiles.size;
+    const totalFiles = isDemo ? changedFiles.length : 0;
+    const reviewed = isDemo ? Math.min(reviewedFiles.size, totalFiles) : 0;
     return (
       <aside className="right-inspector">
         <InspectorHeader title="Review" />
@@ -1027,20 +1083,20 @@ function RightInspector({
           <button type="button">Details</button>
         </div>
         <InspectorCard title="Review queue">
-          <p>{reviewed} of 8 files reviewed</p>
-          <div className="progress"><span style={{ width: `${Math.min(100, reviewed * 12.5)}%` }} /></div>
-          <div className="change-total"><span className="positive">+622 additions</span><span className="negative">-48 deletions</span></div>
+          <p>{reviewed} of {totalFiles} files reviewed</p>
+          <div className="progress"><span style={{ width: `${totalFiles === 0 ? 0 : Math.min(100, (reviewed / totalFiles) * 100)}%` }} /></div>
+          <div className="change-total"><span className="positive">+{isDemo ? 192 : 0} additions</span><span className="negative">-{isDemo ? 13 : 0} deletions</span></div>
         </InspectorCard>
-        <FileQueue reviewedFiles={reviewedFiles} />
+        {isDemo ? <FileQueue reviewedFiles={reviewedFiles} /> : <InspectorCard><p className="empty-state">No changed files yet.</p></InspectorCard>}
         <InspectorCard title="Review actions">
           <ActionButton label="Open in editor" onClick={() => onAction("Opening selected file in editor is queued.")} />
-          <ActionButton label="Apply selected" onClick={() => onAction("Applied selected review changes in demo state.")} />
-          <ActionButton label="Reject selected" onClick={() => onAction("Rejected selected review changes in demo state.")} />
+          <ActionButton label="Apply selected" onClick={() => onAction(isDemo ? "Applied selected review changes in Demo Mode." : "No selected changes to apply.")} />
+          <ActionButton label="Reject selected" onClick={() => onAction(isDemo ? "Rejected selected review changes in Demo Mode." : "No selected changes to reject.")} />
           <ActionButton label="Request more tests" onClick={() => onAction("Requested more tests for selected files.")} />
         </InspectorCard>
         <InspectorCard title="Commit">
-          <input className="field-input" value="Polish app for launch prep" readOnly />
-          <button className="primary-button full-width" type="button" onClick={() => onAction("Commit is staged in demo review state.")}>Commit 4 files</button>
+          <input className="field-input" value={isDemo ? "Prepare local setup cleanup" : ""} placeholder="Commit message" readOnly />
+          <button className="primary-button full-width" type="button" onClick={() => onAction(isDemo ? "Commit preview is ready in Demo Mode." : "No changes are ready to commit.")}>Commit {isDemo ? reviewed : 0} files</button>
         </InspectorCard>
       </aside>
     );
@@ -1053,18 +1109,18 @@ function RightInspector({
         <RuntimeCard health={health} info={info} model={model} />
         <InspectorCard title="Quick actions">
           <ActionButton label="New thread" onClick={onCreateThread} />
-          <ActionButton label="Run tests" onClick={() => onAction("Queued demo test run.")} />
+          <ActionButton label="Run tests" onClick={() => onAction(isDemo ? "Queued Demo Mode test run." : "Create a thread before running agent checks.")} />
           <ActionButton label="View diffs" onClick={onShowReview} />
           <ActionButton label="Open in IDE" onClick={() => onAction("Opening project in IDE is queued.")} />
         </InspectorCard>
         <InspectorCard title="Top changed files">
-          <FileQueue reviewedFiles={reviewedFiles} compact />
+          {isDemo ? <FileQueue reviewedFiles={reviewedFiles} compact /> : <p className="empty-state">No changed files yet.</p>}
         </InspectorCard>
         <InspectorCard title="Last commit">
-          <p>Polish app for launch prep</p>
+          <p>{isDemo ? "Demo workspace checkpoint" : "No commit data loaded."}</p>
           <dl className="runtime-list">
-            <div><dt>Branch</dt><dd>main</dd></div>
-            <div><dt>Checks</dt><dd><span className="positive">All passing</span></dd></div>
+            <div><dt>Branch</dt><dd>{isDemo ? "demo" : "unknown"}</dd></div>
+            <div><dt>Checks</dt><dd><span className={isDemo ? "positive" : ""}>{isDemo ? "Ready" : "Not run"}</span></dd></div>
           </dl>
         </InspectorCard>
       </aside>
@@ -1079,16 +1135,16 @@ function RightInspector({
         <button type="button">Details</button>
       </div>
       <InspectorCard>
-        <p>DeepSeek made code changes and ran tests to polish the app UI and flows.</p>
+        <p>{isDemo ? "DeepSeek prepared a local setup preview with review and verification evidence." : "Start a thread to generate a summary for this workspace."}</p>
       </InspectorCard>
       <InspectorCard title="Changes">
-        <div className="change-total"><span className="positive">+622 additions</span><span className="negative">-48 deletions</span></div>
+        <div className="change-total"><span className="positive">+{isDemo ? 192 : 0} additions</span><span className="negative">-{isDemo ? 13 : 0} deletions</span></div>
       </InspectorCard>
-      <InspectorCard title="Changed files (8)"><FileQueue reviewedFiles={reviewedFiles} compact /></InspectorCard>
+      <InspectorCard title={`Changed files (${isDemo ? changedFiles.length : 0})`}>{isDemo ? <FileQueue reviewedFiles={reviewedFiles} compact /> : <p className="empty-state">No changed files yet.</p>}</InspectorCard>
       <InspectorCard title="Quick actions">
         <ActionButton label="Open diff" onClick={onShowReview} />
-        <ActionButton label="Apply changes" onClick={() => onAction("Applied changes in demo state.")} />
-        <ActionButton label="Request tests" onClick={() => onAction("Requested tests in demo state.")} />
+        <ActionButton label="Apply changes" onClick={() => onAction(isDemo ? "Applied changes in Demo Mode." : "No changes are available to apply.")} />
+        <ActionButton label="Request tests" onClick={() => onAction(isDemo ? "Requested tests in Demo Mode." : "No active changes need tests yet.")} />
       </InspectorCard>
       <RuntimeCard health={health} info={info} model={model} />
     </aside>
@@ -1123,11 +1179,13 @@ function TimelineCard({ item, onApprovalDecision }: { item: TimelineItem; onAppr
 }
 
 function FilesChangedCard({ onOpenReview }: { onOpenReview(): void }) {
+  const additions = changedFiles.reduce((total, file) => total + file.additions, 0);
+  const deletions = changedFiles.reduce((total, file) => total + file.deletions, 0);
   return (
     <Card className="files-card">
       <div className="card-title-row">
         <h3>Files changed</h3>
-        <span>8 files <span className="positive">+622</span> <span className="negative">-48</span></span>
+        <span>{changedFiles.length} files <span className="positive">+{additions}</span> <span className="negative">-{deletions}</span></span>
       </div>
       <FilesChangedTable reviewedFiles={new Set()} onMarkReviewed={() => {}} />
       <button className="text-button" type="button" onClick={onOpenReview}>Open review</button>
@@ -1141,16 +1199,16 @@ function TerminalEvidenceCard({ compact = false }: { compact?: boolean }) {
       <div className="card-title-row">
         <h3>Terminal</h3>
         <span className="positive">All tests passed</span>
-        {!compact ? <span>28.4s</span> : null}
+        {!compact ? <span>21.6s</span> : null}
       </div>
       <pre className="terminal-output">{`> npm test
-PASS app/components/PromptDialog.test.tsx
-PASS app/screens/ArchiveView.test.tsx
-PASS app/components/RootHeader.test.tsx
+	PASS tests/runtime-bridge.test.ts
+	PASS tests/setup-flow.test.ts
+	PASS tests/review-panel.test.ts
 
-Test Suites: 3 passed, 3 total
-Tests:       24 passed, 24 total
-Time:        28.4s`}</pre>
+	Test Suites: 3 passed, 3 total
+	Tests:       18 passed, 18 total
+	Time:        21.6s`}</pre>
     </Card>
   );
 }
@@ -1214,13 +1272,17 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
   return <div className="metric">{icon}<span>{label}</span><strong>{value}</strong></div>;
 }
 
-function TaskList() {
+function TaskList({ isDemo }: { isDemo: boolean }) {
+  if (!isDemo) {
+    return <p className="empty-state">No active tasks yet. Start a thread to create one.</p>;
+  }
+
   return (
     <div className="task-list">
       {[
-        ["Polish app for launch prep", "UI polish, copy updates, and analytics events.", "In progress"],
-        ["Add recipe search with filters", "Search by ingredients, tags, and cuisine.", "In progress"],
-        ["Refactor data layer for caching", "Improve caching strategy for offline mode.", "Queued"],
+        ["Validate runtime setup", "Confirm endpoint, model, and key storage before launch.", "In progress"],
+        ["Review generated changes", "Inspect diffs, terminal evidence, and approval state.", "Ready"],
+        ["Prepare tester handoff", "Summarize install notes and smoke checks.", "Queued"],
       ].map(([title, body, status]) => (
         <article key={title} className="task-item"><strong>{title}</strong><p>{body}</p><span>{status}</span></article>
       ))}
@@ -1232,8 +1294,12 @@ function PromptList({ onCreateThread }: { onCreateThread(): void }) {
   return <div className="prompt-list">{suggestedPrompts.map(([title, body]) => <button key={title} type="button" onClick={onCreateThread}><Sparkles size={16} aria-hidden="true" /><span><strong>{title}</strong><small>{body}</small></span></button>)}</div>;
 }
 
-function ActivityList() {
-  return <div className="activity-list">{["Update recipe schema and types", "Refactor RecipeCard styles", "Add analytics for search events", "Improve error handling in API client"].map((item, index) => <article key={item}><span className="activity-dot" /><div><strong>{item}</strong><p>DeepSeek Agent</p></div><time>{index === 0 ? "9m ago" : `${index}h ago`}</time></article>)}</div>;
+function ActivityList({ isDemo }: { isDemo: boolean }) {
+  if (!isDemo) {
+    return <p className="empty-state">No repository activity loaded yet.</p>;
+  }
+
+  return <div className="activity-list">{["Checked runtime bridge contract", "Prepared setup flow review", "Collected terminal evidence", "Queued tester handoff"].map((item, index) => <article key={item}><span className="activity-dot" /><div><strong>{item}</strong><p>DeepSeek Agent</p></div><time>{index === 0 ? "now" : `${index}h ago`}</time></article>)}</div>;
 }
 
 function FilesChangedTable({ onMarkReviewed, reviewedFiles }: { onMarkReviewed(path: string): void; reviewedFiles: Set<string> }) {
@@ -1323,7 +1389,7 @@ function FieldLabel({ label, value }: { label: string; value: string }) {
 }
 
 function MetricSmall({ delta, label, value }: { delta: string; label: string; value: string }) {
-  return <div className="usage-metric"><span>{label}</span><strong>{value}</strong><small>{delta} vs last 7 days</small></div>;
+  return <div className="usage-metric"><span>{label}</span><strong>{value}</strong><small>{delta}</small></div>;
 }
 
 function ToggleRows() {
@@ -1339,14 +1405,14 @@ const fallbackTimeline: TimelineItem[] = [
     id: "fallback-user",
     kind: "user",
     title: "You",
-    content: "Polish the UI with new launch-ready typography, metadata, and clearer guidance across the booth, prompt dialog, and archive so the experience feels intentional and production-ready.",
+    content: "Inspect this workspace and show how setup, review, approvals, and local verification will work for a tester.",
     status: "completed",
   },
   {
     id: "fallback-agent",
     kind: "assistant",
     title: "DeepSeek Agent",
-    content: "I polished the UI and refined metadata, copy, and flows across the app. Unified typography and spacing, improved prompt guidance, and tightened accessibility states. All tests are passing.",
+    content: "Demo Mode is connected. I can show the local setup flow, review workspace, terminal evidence, and approval handling without requiring an API key.",
     status: "completed",
   },
 ];

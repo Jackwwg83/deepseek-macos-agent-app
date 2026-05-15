@@ -8,7 +8,7 @@ It bundles the web UI and a `deepseek-tui` sidecar. Test users do not need to in
 
 Latest tester alpha:
 
-[DeepSeek Agent v0.1.0-alpha.5](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.5)
+[DeepSeek Agent v0.1.0-alpha.6](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.6)
 
 Download:
 
@@ -64,7 +64,7 @@ The bundled sidecar is used by default.
 - API-key storage through macOS Keychain
 - WKWebView command center UI
 - React/TypeScript embedded UI
-- Fake runtime for offline UI testing
+- Demo Mode runtime for offline UI testing
 - Real DeepSeek-TUI HTTP/SSE runtime adapter
 - Bundled `deepseek-tui` sidecar in the tester package
 - Package verification scripts and checksums
@@ -92,7 +92,7 @@ Run the full validation suite:
 bash scripts/dev/check.sh
 ```
 
-Launch a short fake-runtime smoke:
+Launch a short Demo Mode smoke:
 
 ```bash
 bash scripts/dev/run_fake_runtime.sh

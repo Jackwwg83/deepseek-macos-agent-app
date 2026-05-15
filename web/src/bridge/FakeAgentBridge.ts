@@ -36,18 +36,18 @@ export class FakeAgentBridge implements AgentBridge {
     this.threads = [
       {
         thread: {
-          id: "thread-demo",
-          title: "Polish app for launch prep",
+          id: "thread-welcome",
+          title: "Explore DeepSeek Agent",
           projectPath,
           updatedAt: now,
         },
         items: [
           {
-            id: "demo-user",
+            id: "welcome-user",
             kind: "user",
             title: "You",
             content:
-              "Polish the UI with new launch-ready typography, metadata, and clearer guidance across the app so the experience feels intentional and production-ready.",
+              "Inspect this workspace and show how setup, review, approvals, and local verification will work for a tester.",
             status: "completed",
           },
           {
@@ -55,7 +55,7 @@ export class FakeAgentBridge implements AgentBridge {
             kind: "assistant",
             title: "DeepSeek Agent",
             content:
-              "I inspected the local project context and prepared a launch-readiness pass. The next steps are to tighten the setup flow, review changed files, and keep the runtime state visible without making connection settings the main workspace.",
+              "Demo Mode is connected. I can show the local setup flow, review workspace, terminal evidence, and approval handling without requiring an API key.",
             status: "completed",
           },
         ],

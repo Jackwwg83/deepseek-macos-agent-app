@@ -483,6 +483,18 @@ dt {
   font-weight: 650;
 }
 
+.empty-state {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.empty-state.compact {
+  padding: 8px 10px;
+  color: var(--ds-text-tertiary);
+}
+
 .thread-button {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -109,7 +109,7 @@ final class ShellWindowController: NSWindowController {
         apiKeyField.placeholderString = "Paste API key"
         configureInputField(apiKeyField)
 
-        let saveAndStartButton = NSButton(title: "Start DeepSeek", target: self, action: #selector(saveAndStartRuntime))
+        let saveAndStartButton = NSButton(title: "Complete Setup", target: self, action: #selector(saveAndStartRuntime))
         let fakeRuntimeButton = NSButton(title: "Demo Mode", target: self, action: #selector(useFakeRuntime))
         configureActionButton(saveAndStartButton, emphasized: true)
         configureActionButton(fakeRuntimeButton, emphasized: false)
@@ -306,7 +306,7 @@ final class ShellWindowController: NSWindowController {
     private func startRealRuntime(settings: RuntimeSettings) throws {
         guard let apiKey = try RuntimeSecretResolver.resolveAPIKey(environment: ProcessInfo.processInfo.environment, keychainAPIKey: keychainStore.readAPIKey),
               !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw RuntimeClientError.unsupported("Enter a DeepSeek API key, then click Start DeepSeek.")
+            throw RuntimeClientError.unsupported("Enter a DeepSeek API key, then click Complete Setup.")
         }
 
         guard let binary = sidecarManager.discoverBinary(userSelectedPath: settings.sidecarPath.isEmpty ? nil : settings.sidecarPath) else {

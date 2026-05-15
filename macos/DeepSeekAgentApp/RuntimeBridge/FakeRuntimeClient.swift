@@ -7,7 +7,7 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
         var events: [RuntimeEvent]
     }
 
-    private let queue = DispatchQueue(label: "app.deepseek.fake-runtime")
+    private let queue = DispatchQueue(label: "app.deepseek.demo-runtime")
     private var threads: [ThreadRecord]
     private var seq = 0
     private var completedTurns = 0
@@ -15,8 +15,8 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
 
     init(projectPath: String = "~/Projects") {
         let thread = RuntimeThread(
-            id: "thread-demo",
-            title: "New chat",
+            id: "thread-welcome",
+            title: "Explore DeepSeek Agent",
             projectPath: projectPath,
             updatedAt: isoNow(),
             archived: false

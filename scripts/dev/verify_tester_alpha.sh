@@ -10,6 +10,7 @@ APP_EXEC="$APP_DIR/Contents/MacOS/DeepSeekAgentApp"
 SIDE_BIN="$APP_DIR/Contents/Resources/bin/deepseek-tui"
 WEB_INDEX="$APP_DIR/Contents/Resources/web/index.html"
 ZIP_PATH="$BUILD_ROOT/DeepSeek-Agent-alpha-macos.zip"
+WEB_DIR="$APP_DIR/Contents/Resources/web"
 
 require_file() {
   if [ ! -f "$1" ]; then
@@ -43,6 +44,13 @@ if rg -n 'src="/assets|href="/assets' "$WEB_INDEX" >/dev/null 2>&1; then
 fi
 if rg -n 'type="module"|crossorigin' "$WEB_INDEX" >/dev/null 2>&1; then
   echo "verify-failed: web index uses module/crossorigin attributes that break bundled WKWebView file loading"
+  exit 1
+fi
+
+STALE_DEMO_PATTERN='recipe-app|agent-tools-samples|photobooth|wanderlust|game-experiment|Add drag and drop to gallery|PromptDialog|ArchiveView|RootHeader|sunset over mountains|/Users/local|demo-project|fake-runtime|Advanced sidecar path|Start DeepSeek'
+if rg -n "$STALE_DEMO_PATTERN" "$WEB_DIR" "$APP_EXEC" >/dev/null 2>&1; then
+  echo "verify-failed: package contains stale demo/mock UI strings"
+  rg -n "$STALE_DEMO_PATTERN" "$WEB_DIR" "$APP_EXEC" || true
   exit 1
 fi
 
