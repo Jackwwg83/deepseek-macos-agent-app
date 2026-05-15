@@ -11,6 +11,7 @@ final class ShellWindowController: NSWindowController {
     private let baseURLField = NSTextField(string: "")
     private let modelCombo = NSComboBox()
     private let apiKeyField = NSSecureTextField(string: "")
+    private var runtimeStartupGeneration = 0
     private weak var webView: WKWebView?
 
     init(
@@ -207,6 +208,7 @@ final class ShellWindowController: NSWindowController {
     }
 
     @objc private func useFakeRuntime() {
+        runtimeStartupGeneration += 1
         sidecarManager.stop()
         runtimeClient.replace(with: FakeRuntimeClient(projectPath: FileManager.default.currentDirectoryPath))
         webView?.reload()
@@ -223,16 +225,45 @@ final class ShellWindowController: NSWindowController {
             throw SidecarError.binaryNotFound
         }
 
+        runtimeStartupGeneration += 1
+        let startupGeneration = runtimeStartupGeneration
         sidecarManager.stop()
         let launch = try sidecarManager.start(binaryURL: binary, deepSeekAPIKey: apiKey, runtimeSettings: settings)
-        runtimeClient.replace(with: DeepSeekTuiRuntimeClient(baseURL: launch.baseURL, authToken: launch.authToken))
-        webView?.reload()
+        let client = DeepSeekTuiRuntimeClient(baseURL: launch.baseURL, authToken: launch.authToken)
         statusLabel.stringValue = statusText([
-            "Runtime: connected",
+            "Runtime: starting",
             "URL: saved",
             "Model: \(settings.model)",
             "Local sidecar: \(launch.baseURL.host ?? "127.0.0.1"):\(launch.baseURL.port ?? 0)"
         ], settings: settings)
+
+        Task { [weak self] in
+            do {
+                try await client.waitUntilReady(maxAttempts: 40)
+                await MainActor.run { [weak self] in
+                    guard let self, self.runtimeStartupGeneration == startupGeneration else { return }
+                    self.runtimeClient.replace(with: client)
+                    self.webView?.reload()
+                    self.statusLabel.stringValue = self.statusText([
+                        "Runtime: connected",
+                        "URL: saved",
+                        "Model: \(settings.model)",
+                        "Local sidecar: \(launch.baseURL.host ?? "127.0.0.1"):\(launch.baseURL.port ?? 0)"
+                    ], settings: settings)
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    guard let self, self.runtimeStartupGeneration == startupGeneration else { return }
+                    self.sidecarManager.stop()
+                    self.statusLabel.stringValue = self.statusText([
+                        "Runtime: failed",
+                        "URL: saved",
+                        "Model: \(settings.model)",
+                        "Error: \(error.localizedDescription)"
+                    ], settings: settings)
+                }
+            }
+        }
     }
 
     private func validate(settings: RuntimeSettings) throws {

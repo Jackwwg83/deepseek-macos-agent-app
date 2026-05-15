@@ -8,7 +8,7 @@ It bundles the web UI and a `deepseek-tui` sidecar. Test users do not need to in
 
 Latest tester alpha:
 
-[DeepSeek Agent v0.1.0-alpha.3](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.3)
+[DeepSeek Agent v0.1.0-alpha.4](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.4)
 
 Download:
 
@@ -135,10 +135,11 @@ build/tester-alpha/DeepSeek-Agent-alpha-macos.zip.sha256
 
 ## Validation Status
 
-The `v0.1.0-alpha.3` package was validated with:
+The `v0.1.0-alpha.4` package was validated with:
 
 - `bash scripts/dev/check.sh`
 - `bash scripts/dev/verify_tester_alpha.sh`
+- native startup readiness retry tests
 - packaged app WebView render probe
 - bundled sidecar `/health` smoke
 - real sidecar model-turn smoke with a user-supplied DeepSeek-compatible endpoint

@@ -128,6 +128,47 @@ final class DeepSeekTuiRuntimeClientTests: XCTestCase {
         }
     }
 
+    func testWaitUntilReadyRetriesHealthUntilRuntimeResponds() async throws {
+        var attempts = 0
+        let client = makeClient { request in
+            XCTAssertEqual(request.url?.path, "/health")
+            attempts += 1
+            if attempts < 3 {
+                throw URLError(.cannotConnectToHost)
+            }
+            return jsonResponse(
+                path: request.url!.path,
+                body: #"{"status":"ok","service":"deepseek-runtime-api"}"#
+            )
+        }
+
+        try await client.waitUntilReady(maxAttempts: 3, delayNanoseconds: 0)
+
+        XCTAssertEqual(attempts, 3)
+    }
+
+    func testWaitUntilReadyReportsLocalRuntimeFailureAfterRetries() async {
+        var attempts = 0
+        let client = makeClient { _ in
+            attempts += 1
+            throw URLError(.cannotConnectToHost)
+        }
+
+        do {
+            try await client.waitUntilReady(maxAttempts: 2, delayNanoseconds: 0)
+            XCTFail("Expected readiness wait to fail")
+        } catch let error as RuntimeClientError {
+            guard case .unsupported(let message) = error else {
+                XCTFail("Unexpected runtime error \(error)")
+                return
+            }
+            XCTAssertTrue(message.contains("local DeepSeek runtime"))
+            XCTAssertEqual(attempts, 2)
+        } catch {
+            XCTFail("Unexpected error \(error)")
+        }
+    }
+
     private func makeClient(handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)) -> DeepSeekTuiRuntimeClient {
         MockURLProtocol.handler = handler
         let configuration = URLSessionConfiguration.ephemeral

@@ -18,6 +18,25 @@ final class DeepSeekTuiRuntimeClient: AgentRuntimeClient {
         return RuntimeHealth(status: response.status, mode: "real", message: response.service)
     }
 
+    func waitUntilReady(maxAttempts: Int = 20, delayNanoseconds: UInt64 = 250_000_000) async throws {
+        let attempts = max(1, maxAttempts)
+        var lastError: Error?
+        for attempt in 1...attempts {
+            do {
+                _ = try await health()
+                return
+            } catch {
+                lastError = error
+                if attempt < attempts {
+                    try? await Task.sleep(nanoseconds: delayNanoseconds)
+                }
+            }
+        }
+
+        let detail = lastError?.localizedDescription ?? "Runtime did not become ready."
+        throw RuntimeClientError.unsupported("Could not connect to local DeepSeek runtime. \(detail)")
+    }
+
     func runtimeInfo() async throws -> RuntimeInfo {
         let response: RuntimeAPIInfoResponse = try await request(path: "/v1/runtime/info", method: "GET", body: Optional<Data>.none)
         return RuntimeInfo(
