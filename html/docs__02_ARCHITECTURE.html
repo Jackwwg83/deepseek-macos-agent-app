@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>docs/02_ARCHITECTURE.md</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">docs/02_ARCHITECTURE.md</h1>
+</header>
+<h1 id="architecture">02 — Architecture</h1>
+<h2 id="architecture-summary">Architecture summary</h2>
+<p>The app is a macOS native shell that embeds a React chat surface and
+controls a DeepSeek-TUI sidecar.</p>
+<pre class="text"><code>┌──────────────────────────────────────────────────────┐
+│ macOS App                                            │
+│  SwiftUI/AppKit shell                                │
+│  ├─ Project picker                                   │
+│  ├─ Settings / Keychain                              │
+│  ├─ Sidecar process manager                          │
+│  ├─ Runtime bridge                                   │
+│  └─ WKWebView                                        │
+│       └─ React chat UI                               │
+└──────────────────────┬───────────────────────────────┘
+                       │ local HTTP/SSE, Swift-owned token
+┌──────────────────────▼───────────────────────────────┐
+│ DeepSeek-TUI sidecar                                  │
+│  deepseek-tui serve --http                            │
+│  ├─ RuntimeThreadManager                              │
+│  ├─ Thread / Turn / Item / RuntimeEventRecord         │
+│  ├─ Engine                                            │
+│  ├─ Tools / approvals / sessions / usage              │
+│  └─ DeepSeek API                                      │
+└──────────────────────────────────────────────────────┘</code></pre>
+<h2 id="why-swiftuiappkit-wkwebview">Why SwiftUI/AppKit + WKWebView</h2>
+<p>OpenBridge uses a native macOS shell with embedded React surfaces:
+the native layer owns app state, settings, sessions, provider
+credentials, and WebKit bridge; the web layer renders chat and previews.
+This mirrors what we need, except our runtime is DeepSeek-TUI instead of
+KWWK.</p>
+<p>Because this product is macOS-only, SwiftUI/AppKit is a better first
+target than Tauri. Tauri remains a possible future path only if
+cross-platform becomes important.</p>
+<h2 id="ownership-boundaries">Ownership boundaries</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Component</th>
+<th>Owns</th>
+<th>Must not own</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Swift app shell</td>
+<td>Windowing, project picker, settings, Keychain, sidecar process,
+native bridge, app lifecycle</td>
+<td>Agent loop, prompt assembly, tool execution</td>
+</tr>
+<tr class="even">
+<td>React WebView</td>
+<td>Chat rendering, cards, UI state, optimistic input state</td>
+<td>DeepSeek API key, sidecar token in production, direct filesystem
+mutation</td>
+</tr>
+<tr class="odd">
+<td>Runtime bridge</td>
+<td>Typed command/event API between web and native</td>
+<td>Business logic that belongs in UI or runtime</td>
+</tr>
+<tr class="even">
+<td>Sidecar manager</td>
+<td>Locate/start/stop/restart DeepSeek-TUI; health checks; logs</td>
+<td>Model/tool semantics</td>
+</tr>
+<tr class="odd">
+<td>DeepSeek-TUI sidecar</td>
+<td>Threads, turns, items, events, engine, tools, approvals, usage</td>
+<td>macOS UI product state</td>
+</tr>
+</tbody>
+</table>
+<h2 id="runtime-sidecar-command">Runtime sidecar command</h2>
+<p>Preferred command shape:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="va">DEEPSEEK_API_KEY</span><span class="op">=</span>... <span class="ex">/path/to/deepseek-tui</span> serve <span class="at">--http</span>   <span class="at">--host</span> 127.0.0.1   <span class="at">--port</span> <span class="op">&lt;</span>dynamic_port<span class="op">&gt;</span>   --auth-token <span class="op">&lt;</span>random_high_entropy_token<span class="op">&gt;</span>   --cors-origin http://localhost:3000</span></code></pre></div>
+<p>The exact CLI flags should be verified against the local DeepSeek-TUI
+version. If the dispatcher binary is <code>deepseek</code> instead of
+<code>deepseek-tui</code>, support both.</p>
+<h2 id="native-bridge-model">Native bridge model</h2>
+<p>Production:</p>
+<pre class="text"><code>React -&gt; WKScriptMessageHandler -&gt; Swift RuntimeBridge -&gt; URLSession/SSE -&gt; sidecar</code></pre>
+<p>Development:</p>
+<pre class="text"><code>React dev server -&gt; direct fake runtime or Swift bridge, depending on mode</code></pre>
+<p>Production bridge advantages:</p>
+<ul>
+<li>Runtime bearer token stays in Swift.</li>
+<li>CORS is simplified.</li>
+<li>Native layer can redact logs.</li>
+<li>Native layer can restart sidecar and replay events.</li>
+<li>Native layer can enforce app-level safety prompts before dangerous
+actions.</li>
+</ul>
+<h2 id="threadsession-model">Thread/session model</h2>
+<p>Use DeepSeek-TUI runtime records as canonical runtime state:</p>
+<pre class="text"><code>ThreadRecord  -&gt; project conversation/session
+TurnRecord    -&gt; one user prompt and agent response loop
+TurnItemRecord -&gt; message/tool/file/command/status card
+RuntimeEventRecord(seq, event, payload) -&gt; replayable UI updates</code></pre>
+<p>The GUI should not invent a separate canonical thread model. It may
+normalize data into UI view models, but the runtime IDs must remain
+traceable.</p>
+<h2 id="event-flow">Event flow</h2>
+<pre class="text"><code>User sends prompt
+  -&gt; React calls bridge.startTurn(threadId, input)
+  -&gt; Swift POST /v1/threads/{id}/turns
+  -&gt; sidecar starts Engine turn
+  -&gt; Swift subscribes/reuses SSE /v1/threads/{id}/events?since_seq=N
+  -&gt; RuntimeEventRecord arrives
+  -&gt; Swift forwards sanitized event to React
+  -&gt; React updates cards</code></pre>
+<h2 id="reconnect-and-replay">Reconnect and replay</h2>
+<p>Each active thread should track <code>lastSeq</code>. On
+reconnect:</p>
+<pre class="text"><code>GET /v1/threads/{id}/events?since_seq=&lt;lastSeq&gt;</code></pre>
+<p>The UI must de-duplicate by <code>seq</code>.</p>
+<h2 id="fake-runtime-mode">Fake runtime mode</h2>
+<p>Fake runtime is mandatory for Codex-driven development and CI because
+it allows testing without DeepSeek credentials or a sidecar binary.</p>
+<p>Fake runtime should implement the same bridge interface and
+simulate:</p>
+<ul>
+<li>thread list,</li>
+<li>thread create,</li>
+<li>start turn,</li>
+<li>streaming message delta,</li>
+<li>tool call card,</li>
+<li>approval required,</li>
+<li>approval resolved,</li>
+<li>usage update,</li>
+<li>turn completed.</li>
+</ul>
+<h2 id="future-app-server-option">Future app-server option</h2>
+<p>Do not implement JSON-RPC app-server in the MVP. Codex app-server is
+useful as a reference for future bidirectional protocol design, but the
+DeepSeek-TUI Runtime API already exposes enough thread/turn/event
+functionality for a first app.</p>
+<p>Future migration path:</p>
+<pre class="text"><code>HTTP/SSE adapter -&gt; typed bridge -&gt; optional WebSocket/JSON-RPC adapter</code></pre>
+</body>
+</html>

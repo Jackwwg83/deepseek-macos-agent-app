@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>README.md</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">README.md</h1>
+</header>
+<h1 id="deepseek-macos-agent-app-codex-goal-design-pack">DeepSeek macOS
+Agent App — Codex Goal Design Pack</h1>
+<p>This document pack is designed to be copied into a new repository or
+an existing prototype repository and then used with Codex
+<code>/goal</code> mode.</p>
+<p>The product target is a <strong>macOS-only local agent
+app</strong>:</p>
+<ul>
+<li><strong>Runtime core:</strong> DeepSeek-TUI, launched as a local
+sidecar process.</li>
+<li><strong>Model ecosystem:</strong> DeepSeek only.</li>
+<li><strong>UI reference:</strong> OpenBridge-style macOS native shell +
+embedded React WebView chat surface.</li>
+<li><strong>Development agent:</strong> Codex, using <code>/goal</code>
+mode to iterate until a testable MVP exists.</li>
+</ul>
+<h2 id="recommended-first-implementation">Recommended first
+implementation</h2>
+<p>Use a native macOS app architecture:</p>
+<pre class="text"><code>SwiftUI/AppKit shell
+  ├─ Settings, project picker, sidecar lifecycle, Keychain secrets
+  ├─ WKWebView embedded chat UI
+  └─ Native bridge proxying requests to the sidecar
+
+React/TypeScript embedded web UI
+  ├─ Chat timeline
+  ├─ Tool cards
+  ├─ Approval modal
+  ├─ Diff/review panel
+  └─ Usage/cost footer
+
+DeepSeek-TUI sidecar
+  └─ deepseek-tui serve --http --host 127.0.0.1 --port &lt;dynamic&gt; --auth-token &lt;random&gt;</code></pre>
+<p>Do <strong>not</strong> make the GUI scrape terminal output. Do
+<strong>not</strong> rewrite the DeepSeek-TUI runtime. The first version
+should treat DeepSeek-TUI as a sidecar runtime and talk to its HTTP/SSE
+Runtime API.</p>
+<h2 id="how-to-use-this-pack-with-codex">How to use this pack with
+Codex</h2>
+<ol type="1">
+<li>Copy this folder into the repository where the app will be
+developed.</li>
+<li>Add the provided <code>AGENTS.md</code> to the repository root.</li>
+<li>Enable Codex goals if needed.</li>
+<li>Start Codex in the repository root and paste the goal from
+<code>CODEX_GOAL.md</code>.</li>
+</ol>
+<p>Example:</p>
+<pre class="text"><code>/goal Implement CODEX_GOAL.md. Keep iterating until the MVP can be launched locally and all documented checks pass, or stop with a precise blocker and evidence.</code></pre>
+<h2 id="document-map">Document map</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>CODEX_GOAL.md</code></td>
+<td>Main <code>/goal</code> objective for Codex.</td>
+</tr>
+<tr class="even">
+<td><code>AGENTS.md</code></td>
+<td>Repository instructions Codex should read before work.</td>
+</tr>
+<tr class="odd">
+<td><code>.codex/config.toml.example</code></td>
+<td>Suggested Codex config for this project.</td>
+</tr>
+<tr class="even">
+<td><code>docs/01_PRODUCT_SPEC.md</code></td>
+<td>Product definition and MVP scope.</td>
+</tr>
+<tr class="odd">
+<td><code>docs/02_ARCHITECTURE.md</code></td>
+<td>macOS app, web UI, bridge, and sidecar architecture.</td>
+</tr>
+<tr class="even">
+<td><code>docs/03_RUNTIME_ADAPTER.md</code></td>
+<td>DeepSeek-TUI Runtime API integration contract.</td>
+</tr>
+<tr class="odd">
+<td><code>docs/04_UI_DESIGN_OPENBRIDGE_REFERENCE.md</code></td>
+<td>UI and UX reference derived from OpenBridge.</td>
+</tr>
+<tr class="even">
+<td><code>docs/05_IMPLEMENTATION_ROADMAP.md</code></td>
+<td>Goal-friendly implementation phases.</td>
+</tr>
+<tr class="odd">
+<td><code>docs/06_TEST_PLAN.md</code></td>
+<td>Validation commands and test strategy.</td>
+</tr>
+<tr class="even">
+<td><code>docs/07_SECURITY_AND_PACKAGING.md</code></td>
+<td>Keychain, token, sidecar, signing, and license guidance.</td>
+</tr>
+<tr class="odd">
+<td><code>docs/08_UPSTREAM_COMPATIBILITY.md</code></td>
+<td>Strategy for staying compatible with DeepSeek-TUI updates.</td>
+</tr>
+<tr class="even">
+<td><code>docs/09_CODEX_GOAL_WORKFLOW.md</code></td>
+<td>How to run this project with Codex <code>/goal</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>docs/10_SOURCE_INVENTORY.md</code></td>
+<td>What was inspected in DeepSeek-TUI and why it matters.</td>
+</tr>
+<tr class="even">
+<td><code>docs/11_DECISION_LOG.md</code></td>
+<td>Architecture decisions and tradeoffs.</td>
+</tr>
+<tr class="odd">
+<td><code>docs/12_ACCEPTANCE_CHECKLIST.md</code></td>
+<td>Checklist for the first testable app.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="external-references-used">External references used</h2>
+<ul>
+<li>Codex <code>/goal</code> use case:
+https://developers.openai.com/codex/use-cases/follow-goals</li>
+<li>Codex Goals cookbook:
+https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex</li>
+<li>Codex slash commands:
+https://developers.openai.com/codex/cli/slash-commands</li>
+<li>Codex AGENTS.md guidance:
+https://developers.openai.com/codex/guides/agents-md</li>
+<li>Codex best practices:
+https://developers.openai.com/codex/learn/best-practices</li>
+<li>Codex app-server protocol reference:
+https://developers.openai.com/codex/app-server</li>
+<li>Codex app product reference:
+https://developers.openai.com/codex/app</li>
+<li>OpenBridge repository: https://github.com/AFK-surf/OpenBridge</li>
+<li>OpenBridge architecture:
+https://github.com/AFK-surf/OpenBridge/blob/main/docs/ARCHITECTURE.md</li>
+<li>OpenBridge AGENTS.md:
+https://github.com/AFK-surf/OpenBridge/blob/main/AGENTS.md</li>
+<li>OpenBridge sandbox-vm README:
+https://github.com/AFK-surf/OpenBridge/blob/main/sandbox-vm/README.md</li>
+<li>OpenBridge security policy:
+https://github.com/AFK-surf/OpenBridge/security</li>
+</ul>
+<h2 id="local-source-inspected">Local source inspected</h2>
+<ul>
+<li>Uploaded archive: <code>/mnt/data/DeepSeek-TUI-main.zip</code></li>
+<li>Extracted root:
+<code>/mnt/data/deepseek_tui_src/DeepSeek-TUI-main</code></li>
+<li>Important files inspected:
+<ul>
+<li><code>Cargo.toml</code></li>
+<li><code>crates/tui/src/runtime_api.rs</code></li>
+<li><code>crates/tui/src/runtime_threads.rs</code></li>
+<li><code>crates/tui/src/core/engine.rs</code></li>
+<li><code>crates/tui/src/core/events.rs</code></li>
+<li><code>crates/cli/src/lib.rs</code></li>
+</ul></li>
+</ul>
+</body>
+</html>

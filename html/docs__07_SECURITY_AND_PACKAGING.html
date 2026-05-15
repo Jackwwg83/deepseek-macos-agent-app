@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>docs/07_SECURITY_AND_PACKAGING.md</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">docs/07_SECURITY_AND_PACKAGING.md</h1>
+</header>
+<h1 id="security-and-packaging">07 — Security and Packaging</h1>
+<h2 id="security-stance">Security stance</h2>
+<p>This app controls a local coding agent that can read files, run
+tools, and request shell/file/network actions. Treat the sidecar as
+powerful local software.</p>
+<h2 id="defaults">Defaults</h2>
+<ul>
+<li>Bind sidecar to <code>127.0.0.1</code> only.</li>
+<li>Generate a fresh high-entropy bearer token per sidecar launch.</li>
+<li>Keep token in Swift; do not expose it to WebView JavaScript in
+production.</li>
+<li>Store DeepSeek API key in macOS Keychain.</li>
+<li>Launch sidecar with API key via environment variable, not
+command-line argument.</li>
+<li>Default mode should be Agent with approvals, not YOLO/trust
+mode.</li>
+<li>Fake runtime mode must be clearly labeled.</li>
+</ul>
+<h2 id="sensitive-areas">Sensitive areas</h2>
+<ul>
+<li>DeepSeek API key.</li>
+<li>Runtime bearer token.</li>
+<li>Sidecar logs.</li>
+<li>Approval decisions.</li>
+<li>Shell command previews.</li>
+<li>File diffs and paths.</li>
+<li>WebView bridge messages.</li>
+<li>App signing and release scripts.</li>
+</ul>
+<h2 id="webview-bridge-policy">WebView bridge policy</h2>
+<ul>
+<li>Validate every message from WebView.</li>
+<li>Reject unknown method names.</li>
+<li>Bound payload size.</li>
+<li>Redact secrets before sending logs/events to WebView.</li>
+<li>Use a typed schema shared between Swift and TypeScript where
+practical.</li>
+</ul>
+<h2 id="sidecar-process-policy">Sidecar process policy</h2>
+<ul>
+<li>Sidecar path must be user-approved or bundled.</li>
+<li>Show the resolved sidecar binary path in diagnostics.</li>
+<li>Verify executable bit.</li>
+<li>For bundled release, document checksum or signature strategy.</li>
+<li>Stop sidecar on app termination.</li>
+<li>Restart only after explicit user action or safe automatic
+retry.</li>
+</ul>
+<h2 id="approval-ui-policy">Approval UI policy</h2>
+<p>Every approval card should show:</p>
+<ul>
+<li>action type,</li>
+<li>tool name,</li>
+<li>path or command,</li>
+<li>cwd,</li>
+<li>expected side effect,</li>
+<li>allow/deny controls,</li>
+<li>remember flag only if runtime supports it.</li>
+</ul>
+<p>Dangerous actions should require explicit confirmation.</p>
+<h2 id="keychain-storage">Keychain storage</h2>
+<p>Store:</p>
+<ul>
+<li>DeepSeek API key.</li>
+<li>Optional user-selected sidecar binary path can be stored in app
+preferences, not Keychain.</li>
+<li>Runtime token should be memory-only per launch.</li>
+</ul>
+<h2 id="logs">Logs</h2>
+<p>Redact:</p>
+<ul>
+<li>API keys,</li>
+<li>bearer tokens,</li>
+<li><code>Authorization</code> headers,</li>
+<li>environment variables containing <code>KEY</code>,
+<code>TOKEN</code>, <code>SECRET</code>, <code>PASSWORD</code>,</li>
+<li>paths under sensitive user directories when not necessary.</li>
+</ul>
+<h2 id="licensing">Licensing</h2>
+<p>DeepSeek-TUI is MIT licensed in the uploaded source. OpenBridge is
+also MIT licensed, but this project should not copy OpenBridge code. If
+bundling DeepSeek-TUI binary:</p>
+<ul>
+<li>Include its license notice.</li>
+<li>Document exact version.</li>
+<li>Provide source link.</li>
+<li>Preserve notices for any copied/modified files.</li>
+</ul>
+<p>Codex/OpenAI product names are references only. Do not use
+OpenAI/Codex branding in the app name or UI in a way that implies
+affiliation.</p>
+<h2 id="packaging-stages">Packaging stages</h2>
+<h3 id="debug">Debug</h3>
+<ul>
+<li>Unsigned debug app.</li>
+<li>User points to local sidecar binary.</li>
+<li>Fake runtime supported.</li>
+</ul>
+<h3 id="internal-alpha">Internal alpha</h3>
+<ul>
+<li>Bundle sidecar binary in <code>Contents/Resources/bin</code>.</li>
+<li>Show sidecar version.</li>
+<li>Include license notices.</li>
+<li>Not notarized unless needed.</li>
+</ul>
+<h3 id="public-release">Public release</h3>
+<ul>
+<li>Code sign app.</li>
+<li>Code sign bundled sidecar.</li>
+<li>Notarize app.</li>
+<li>Hardened runtime.</li>
+<li>Sparkle or equivalent updater if desired.</li>
+<li>Checksums and release notes.</li>
+</ul>
+<h2 id="threat-scenarios">Threat scenarios</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Scenario</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Malicious webpage tries to call sidecar</td>
+<td>Sidecar bound to loopback, token required, token not in JS
+production state.</td>
+</tr>
+<tr class="even">
+<td>WebView message injection</td>
+<td>Strict method schema and payload validation.</td>
+</tr>
+<tr class="odd">
+<td>API key leakage through process list</td>
+<td>Pass key via environment, not argv; redact logs.</td>
+</tr>
+<tr class="even">
+<td>Sidecar exposed on LAN</td>
+<td>Never bind non-loopback in app-managed mode.</td>
+</tr>
+<tr class="odd">
+<td>User approves risky shell command</td>
+<td>Clear preview and explicit approval UX.</td>
+</tr>
+<tr class="even">
+<td>Upstream API changes break UI silently</td>
+<td>Capability/version checks and contract tests.</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

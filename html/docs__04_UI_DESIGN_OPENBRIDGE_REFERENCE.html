@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>docs/04_UI_DESIGN_OPENBRIDGE_REFERENCE.md</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">docs/04_UI_DESIGN_OPENBRIDGE_REFERENCE.md</h1>
+</header>
+<h1 id="ui-design-openbridge-reference">04 — UI Design, OpenBridge
+Reference</h1>
+<h2 id="what-to-borrow-from-openbridge">What to borrow from
+OpenBridge</h2>
+<p>OpenBridge is useful as a UI/product reference because it
+combines:</p>
+<ul>
+<li>macOS SwiftUI/AppKit shell,</li>
+<li>embedded React WebView chat/preview surfaces,</li>
+<li>native settings and provider management,</li>
+<li>local runtime orchestration,</li>
+<li>skills/memory/schedules UI,</li>
+<li>sandbox review workflow,</li>
+<li>security-sensitive WebView bridge boundaries.</li>
+</ul>
+<p>For this product, borrow the shape, not the runtime. OpenBridge uses
+KWWK and a Go sandbox VM; this app uses DeepSeek-TUI sidecar.</p>
+<h2 id="main-window-layout">Main window layout</h2>
+<pre class="text"><code>┌─────────────────────────────────────────────────────────────────────┐
+│ Toolbar: Project ▾  Runtime ●  Model V4  Mode Agent  Cost ¥/$       │
+├───────────────┬─────────────────────────────────────┬───────────────┤
+│ Project/      │ Active thread timeline              │ Review/       │
+│ Thread list   │                                     │ Inspector     │
+│               │  User message                       │               │
+│  Projects     │  Assistant streaming text           │  Changed files│
+│  Threads      │  Tool card                          │  Approvals    │
+│  Tasks        │  Command output                     │  Usage        │
+│  Skills       │  Approval card                      │  MCP/Skills   │
+│               │                                     │               │
+├───────────────┴─────────────────────────────────────┴───────────────┤
+│ Composer: prompt input | Attach | Plan/Agent/Yolo | Send | Stop      │
+└─────────────────────────────────────────────────────────────────────┘</code></pre>
+<h2 id="screens">Screens</h2>
+<h3 id="onboarding">1. Onboarding</h3>
+<ul>
+<li>Choose DeepSeek-TUI binary path.</li>
+<li>Enter DeepSeek API key.</li>
+<li>Test sidecar launch.</li>
+<li>Optional: continue with fake runtime.</li>
+</ul>
+<h3 id="project-selector">2. Project selector</h3>
+<ul>
+<li>Recently opened projects.</li>
+<li>Add project folder.</li>
+<li>Per-project runtime mode and model.</li>
+</ul>
+<h3 id="thread-workspace">3. Thread workspace</h3>
+<ul>
+<li>Left sidebar: thread list, status, last update.</li>
+<li>Center: chat timeline.</li>
+<li>Right panel: review/diff/approvals/usage.</li>
+</ul>
+<h3 id="settings">4. Settings</h3>
+<ul>
+<li>DeepSeek API key stored in Keychain.</li>
+<li>Sidecar binary path.</li>
+<li>Default model/mode.</li>
+<li>Fake runtime toggle.</li>
+<li>Logs and diagnostics.</li>
+</ul>
+<h3 id="sidecar-diagnostics">5. Sidecar diagnostics</h3>
+<ul>
+<li>Binary path.</li>
+<li>Runtime API URL.</li>
+<li>Auth enabled.</li>
+<li>Version.</li>
+<li>Last health check.</li>
+<li>Start/stop/restart buttons.</li>
+<li>Redacted logs.</li>
+</ul>
+<h2 id="card-types">Card types</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Card</th>
+<th>Inputs</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>User message</td>
+<td>submitted prompt</td>
+<td>Plain text/markdown.</td>
+</tr>
+<tr class="even">
+<td>Assistant message</td>
+<td><code>item.delta</code>/<code>item.completed</code></td>
+<td>Streaming markdown.</td>
+</tr>
+<tr class="odd">
+<td>Reasoning summary</td>
+<td>reasoning/status payload</td>
+<td>Collapsible by default.</td>
+</tr>
+<tr class="even">
+<td>Tool call</td>
+<td><code>item.started</code> metadata</td>
+<td>Name, input summary, status.</td>
+</tr>
+<tr class="odd">
+<td>Shell command</td>
+<td>tool metadata or command output</td>
+<td>Command, cwd, stdout/stderr, exit code.</td>
+</tr>
+<tr class="even">
+<td>File change</td>
+<td>file/patch metadata</td>
+<td>Diff preview, open file, copy patch.</td>
+</tr>
+<tr class="odd">
+<td>Approval</td>
+<td><code>approval.required</code></td>
+<td>Allow/Deny buttons; risk details.</td>
+</tr>
+<tr class="even">
+<td>Usage</td>
+<td>usage payload or <code>/v1/usage</code></td>
+<td>Tokens, cached tokens, cost.</td>
+</tr>
+<tr class="odd">
+<td>Error</td>
+<td>failed events</td>
+<td>Error, retry, diagnostics.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="approval-ux">Approval UX</h2>
+<p>Modal and inline card should show:</p>
+<ul>
+<li>approval ID,</li>
+<li>thread/turn context,</li>
+<li>tool name,</li>
+<li>command or file path,</li>
+<li>risk explanation,</li>
+<li>allow once,</li>
+<li>allow and remember if runtime supports <code>remember</code>,</li>
+<li>deny,</li>
+<li>stop turn.</li>
+</ul>
+<p>Approval decisions go through the Swift bridge to:</p>
+<pre class="http"><code>POST /v1/approvals/{approval_id}</code></pre>
+<h2 id="review-panel">Review panel</h2>
+<p>MVP:</p>
+<ul>
+<li>Show file-change cards when events contain file metadata.</li>
+<li>Show workspace status via <code>/v1/workspace/status</code> if
+available.</li>
+<li>Provide rollback guidance if runtime supports snapshots.</li>
+</ul>
+<p>Future:</p>
+<ul>
+<li>Git worktree isolation.</li>
+<li>Accept selected hunks.</li>
+<li>Apply/discard review workflow inspired by OpenBridge sandbox
+review.</li>
+</ul>
+<h2 id="usagecost-ux">Usage/cost UX</h2>
+<p>Because the product is DeepSeek-only, make usage highly visible:</p>
+<ul>
+<li>model,</li>
+<li>input tokens,</li>
+<li>output tokens,</li>
+<li>cached tokens,</li>
+<li>estimated cost,</li>
+<li>turn-level cost,</li>
+<li>thread-level total,</li>
+<li>date/model/provider grouping via <code>/v1/usage</code>.</li>
+</ul>
+<h2 id="visual-style">Visual style</h2>
+<ul>
+<li>Native macOS sidebar proportions.</li>
+<li>Clean cards with status chips.</li>
+<li>Minimal color; use system colors where possible.</li>
+<li>Support light/dark mode.</li>
+<li>Use monospaced font for commands and diffs.</li>
+<li>Keep the interface readable before making it visually
+elaborate.</li>
+</ul>
+<h2 id="accessibility">Accessibility</h2>
+<ul>
+<li>Keyboard navigation for thread list and composer.</li>
+<li>Buttons have labels, not just icons.</li>
+<li>Approval actions are reachable by keyboard.</li>
+<li>Text contrast follows macOS defaults.</li>
+<li>Streaming updates should not steal focus.</li>
+</ul>
+<h2 id="openbridge-comparison-matrix">OpenBridge comparison matrix</h2>
+<table>
+<thead>
+<tr class="header">
+<th>OpenBridge concept</th>
+<th>This app equivalent</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>SwiftUI shell</td>
+<td>SwiftUI/AppKit shell.</td>
+</tr>
+<tr class="even">
+<td>Embedded React WebViews</td>
+<td>WKWebView React chat surface.</td>
+</tr>
+<tr class="odd">
+<td>KWWK runtime</td>
+<td>DeepSeek-TUI sidecar runtime.</td>
+</tr>
+<tr class="even">
+<td>Provider registry</td>
+<td>DeepSeek-only settings.</td>
+</tr>
+<tr class="odd">
+<td>Sandbox VM review</td>
+<td>MVP diff/approval; future worktree review.</td>
+</tr>
+<tr class="even">
+<td>Skills UI</td>
+<td>DeepSeek-TUI skills list and toggles where exposed.</td>
+</tr>
+<tr class="odd">
+<td>WebKit bridge</td>
+<td>Swift runtime bridge.</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

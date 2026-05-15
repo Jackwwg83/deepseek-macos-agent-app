@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>docs/11_DECISION_LOG.md</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">docs/11_DECISION_LOG.md</h1>
+</header>
+<h1 id="decision-log">11 — Decision Log</h1>
+<h2 id="adr-001-use-deepseek-tui-as-sidecar-runtime">ADR-001: Use
+DeepSeek-TUI as sidecar runtime</h2>
+<p>Decision: Use DeepSeek-TUI sidecar via Runtime API.</p>
+<p>Rationale:</p>
+<ul>
+<li>Keeps upstream compatibility.</li>
+<li>Avoids reimplementing agent loop.</li>
+<li>Allows immediate GUI work.</li>
+<li>Fits current source structure where runtime API lives under
+<code>crates/tui</code>.</li>
+</ul>
+<p>Rejected:</p>
+<ul>
+<li>Embed Rust runtime via Swift FFI.</li>
+<li>Scrape terminal output.</li>
+<li>Fork DeepSeek-TUI and rewrite runtime.</li>
+</ul>
+<h2 id="adr-002-macos-native-shell-with-embedded-react-webview">ADR-002:
+macOS native shell with embedded React WebView</h2>
+<p>Decision: Use SwiftUI/AppKit + WKWebView + React/TypeScript.</p>
+<p>Rationale:</p>
+<ul>
+<li>Mac-only product.</li>
+<li>Strong match to OpenBridge UI architecture.</li>
+<li>Native layer can own Keychain and sidecar lifecycle.</li>
+<li>Web layer is better for streaming markdown, tool cards, and diff
+rendering.</li>
+</ul>
+<p>Rejected:</p>
+<ul>
+<li>Tauri for MVP, because cross-platform is not required.</li>
+<li>Pure SwiftUI chat renderer, because rich streaming/diff/tool UI will
+iterate faster in React.</li>
+</ul>
+<h2 id="adr-003-bridge-proxies-runtime-calls">ADR-003: Bridge proxies
+runtime calls</h2>
+<p>Decision: React calls Swift bridge; Swift calls sidecar.</p>
+<p>Rationale:</p>
+<ul>
+<li>Prevents runtime token leakage into WebView JavaScript in
+production.</li>
+<li>Allows native reconnect and redaction logic.</li>
+<li>Avoids CORS complexity.</li>
+</ul>
+<p>Rejected:</p>
+<ul>
+<li>React directly fetches sidecar in production.</li>
+</ul>
+<h2 id="adr-004-fake-runtime-is-mandatory">ADR-004: Fake runtime is
+mandatory</h2>
+<p>Decision: Implement fake runtime mode first.</p>
+<p>Rationale:</p>
+<ul>
+<li>Codex can test UI without DeepSeek credentials.</li>
+<li>CI/dev environments may lack sidecar binary.</li>
+<li>Enables deterministic event stream tests.</li>
+</ul>
+<p>Rejected:</p>
+<ul>
+<li>Only testing against real DeepSeek-TUI.</li>
+</ul>
+<h2 id="adr-005-no-vm-sandbox-in-mvp">ADR-005: No VM sandbox in MVP</h2>
+<p>Decision: Prepare review UI, but skip VM sandbox in the first
+release.</p>
+<p>Rationale:</p>
+<ul>
+<li>OpenBridge VM sandbox is valuable but heavy.</li>
+<li>DeepSeek-TUI already has approvals/snapshots/rollback-oriented
+behavior.</li>
+<li>Product validation should happen before expensive isolation
+engineering.</li>
+</ul>
+<p>Future:</p>
+<ul>
+<li>Git worktree review first.</li>
+<li>VM/container sandbox later.</li>
+</ul>
+<h2 id="adr-006-deepseek-only-provider-scope">ADR-006: DeepSeek-only
+provider scope</h2>
+<p>Decision: MVP supports only DeepSeek.</p>
+<p>Rationale:</p>
+<ul>
+<li>User explicitly wants DeepSeek ecosystem.</li>
+<li>Reduces settings and adapter complexity.</li>
+<li>Allows focus on cache/cost/model UX.</li>
+</ul>
+<p>Rejected:</p>
+<ul>
+<li>OpenBridge-style provider registry for many providers.</li>
+</ul>
+</body>
+</html>

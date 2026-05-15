@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>docs/01_PRODUCT_SPEC.md</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">docs/01_PRODUCT_SPEC.md</h1>
+</header>
+<h1 id="product-spec">01 — Product Spec</h1>
+<h2 id="product-name-placeholder">Product name placeholder</h2>
+<p><code>DeepSeek Agent App</code> — final branding can change.</p>
+<h2 id="product-thesis">Product thesis</h2>
+<p>A macOS local-first coding agent app that makes DeepSeek-TUI feel
+like a native desktop product: project sidebar, parallel threads, chat
+timeline, tool cards, approvals, diffs, usage/cost visibility, and
+reliable sidecar status.</p>
+<h2 id="target-user">Target user</h2>
+<ul>
+<li>macOS developer using DeepSeek-TUI or DeepSeek API.</li>
+<li>Wants a Codex App/OpenBridge-like GUI without leaving DeepSeek
+ecosystem.</li>
+<li>Wants local execution and clear approval/review surfaces.</li>
+</ul>
+<h2 id="mvp-scope">MVP scope</h2>
+<h3 id="must-have">Must have</h3>
+<ol type="1">
+<li>macOS app shell.</li>
+<li>Embedded chat UI.</li>
+<li>DeepSeek-TUI sidecar lifecycle.</li>
+<li>Fake runtime mode.</li>
+<li>Project folder selection.</li>
+<li>Thread list and active thread detail.</li>
+<li>Start a turn from user input.</li>
+<li>SSE event stream rendering with replay using
+<code>since_seq</code>.</li>
+<li>Approval UI that can submit allow/deny.</li>
+<li>Usage/cost footer fed by <code>/v1/usage</code> and turn usage
+events.</li>
+<li>Settings for DeepSeek API key and sidecar binary path.</li>
+<li>App can build and run locally.</li>
+</ol>
+<h3 id="should-have">Should have</h3>
+<ul>
+<li>File-change/diff panel when runtime events contain patch/diff
+metadata.</li>
+<li>Shell output card.</li>
+<li>MCP/skills list read-only view.</li>
+<li>Sidecar log viewer with redaction.</li>
+<li>Thread archive/resume controls.</li>
+</ul>
+<h3 id="later">Later</h3>
+<ul>
+<li>Git worktree review workflow.</li>
+<li>VM/container sandbox.</li>
+<li>Multi-window or multi-thread parallel UI.</li>
+<li>JSON-RPC app-server protocol.</li>
+<li>IDE integration.</li>
+<li>Cloud/mobile control.</li>
+</ul>
+<h2 id="non-goals">Non-goals</h2>
+<ul>
+<li>No provider marketplace in the MVP.</li>
+<li>No OpenAI/Codex model integration.</li>
+<li>No KWWK runtime.</li>
+<li>No OpenBridge fork.</li>
+<li>No direct terminal scraping.</li>
+<li>No VM sandbox in the first milestone.</li>
+</ul>
+<h2 id="user-journeys">User journeys</h2>
+<h3 id="journey-a-first-launch-with-fake-runtime">Journey A: first
+launch with fake runtime</h3>
+<ol type="1">
+<li>User opens the app.</li>
+<li>App shows onboarding and fake runtime toggle.</li>
+<li>User selects a sample project folder.</li>
+<li>UI shows sample thread and event timeline.</li>
+<li>User sends a test message.</li>
+<li>Fake runtime streams message/tool/approval/usage events.</li>
+<li>User approves or denies the sample approval.</li>
+</ol>
+<h3 id="journey-b-real-deepseek-tui-runtime">Journey B: real
+DeepSeek-TUI runtime</h3>
+<ol type="1">
+<li>User installs or points to <code>deepseek-tui</code> binary.</li>
+<li>User enters DeepSeek API key in Settings.</li>
+<li>App launches sidecar on loopback with bearer token.</li>
+<li>App creates a thread for the selected project.</li>
+<li>User sends message.</li>
+<li>Runtime streams events into UI.</li>
+<li>User reviews approvals and outputs.</li>
+</ol>
+<h3 id="journey-c-recover-from-sidecar-crash">Journey C: recover from
+sidecar crash</h3>
+<ol type="1">
+<li>Sidecar exits unexpectedly.</li>
+<li>UI shows disconnected state.</li>
+<li>App offers restart.</li>
+<li>Restarted sidecar resumes thread list from runtime store if
+available.</li>
+<li>UI reconnects and replays events using <code>since_seq</code>.</li>
+</ol>
+<h2 id="product-differentiators">Product differentiators</h2>
+<ul>
+<li>DeepSeek-only, with cost/cache UX prioritized.</li>
+<li>Local-first sidecar runtime.</li>
+<li>macOS-native app feel inspired by OpenBridge.</li>
+<li>Strong event-card UI for tool execution and approvals.</li>
+<li>Designed to stay compatible with upstream DeepSeek-TUI.</li>
+</ul>
+</body>
+</html>

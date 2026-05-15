@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>docs/12_ACCEPTANCE_CHECKLIST.md</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">docs/12_ACCEPTANCE_CHECKLIST.md</h1>
+</header>
+<h1 id="acceptance-checklist">12 — Acceptance Checklist</h1>
+<p>Codex should not mark the goal complete until this checklist is
+satisfied or each unsatisfied item has a precise blocker.</p>
+<h2 id="repository-and-scripts">Repository and scripts</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" /><code>macos/</code> app project
+exists.</label></li>
+<li><label><input type="checkbox" /><code>web/</code> embedded UI
+project exists.</label></li>
+<li><label><input
+type="checkbox" /><code>scripts/dev/bootstrap.sh</code>
+exists.</label></li>
+<li><label><input type="checkbox" /><code>scripts/dev/check.sh</code>
+exists.</label></li>
+<li><label><input
+type="checkbox" /><code>scripts/dev/run_fake_runtime.sh</code>
+exists.</label></li>
+<li><label><input
+type="checkbox" /><code>scripts/dev/run_macos_app.sh</code>
+exists.</label></li>
+<li><label><input type="checkbox" /><code>docs/PROGRESS.md</code> exists
+and is updated.</label></li>
+</ul>
+<h2 id="native-app">Native app</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />App builds in unsigned debug
+mode.</label></li>
+<li><label><input type="checkbox" />App opens a main
+window.</label></li>
+<li><label><input type="checkbox" />App loads embedded chat
+UI.</label></li>
+<li><label><input type="checkbox" />App has settings or onboarding for
+DeepSeek API key and sidecar path.</label></li>
+<li><label><input type="checkbox" />App has sidecar status
+display.</label></li>
+<li><label><input type="checkbox" />App stores API key in Keychain or
+clearly uses fake/dev mode.</label></li>
+</ul>
+<h2 id="web-ui">Web UI</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />Thread list renders.</label></li>
+<li><label><input type="checkbox" />Active thread timeline
+renders.</label></li>
+<li><label><input type="checkbox" />Composer sends a
+prompt.</label></li>
+<li><label><input type="checkbox" />Assistant message
+streams.</label></li>
+<li><label><input type="checkbox" />Tool card renders.</label></li>
+<li><label><input type="checkbox" />Approval card/modal
+renders.</label></li>
+<li><label><input type="checkbox" />Usage/cost footer
+renders.</label></li>
+<li><label><input type="checkbox" />Disconnected/error state
+renders.</label></li>
+</ul>
+<h2 id="runtime">Runtime</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />Fake runtime mode works without
+external credentials.</label></li>
+<li><label><input type="checkbox" />Sidecar manager can discover binary
+from <code>DEEPSEEK_TUI_BIN</code>.</label></li>
+<li><label><input type="checkbox" />Sidecar manager starts runtime on
+loopback.</label></li>
+<li><label><input type="checkbox" />Sidecar manager uses random
+token.</label></li>
+<li><label><input type="checkbox" />Runtime adapter calls
+<code>/health</code> and <code>/v1/runtime/info</code>.</label></li>
+<li><label><input type="checkbox" />Runtime adapter can create/list/get
+threads.</label></li>
+<li><label><input type="checkbox" />Runtime adapter can start a
+turn.</label></li>
+<li><label><input type="checkbox" />Runtime adapter can subscribe to
+events with <code>since_seq</code>.</label></li>
+<li><label><input type="checkbox" />Runtime adapter can send approval
+decision.</label></li>
+<li><label><input type="checkbox" />Runtime adapter can interrupt a
+turn.</label></li>
+<li><label><input type="checkbox" />Runtime adapter can query
+usage.</label></li>
+</ul>
+<h2 id="security">Security</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />DeepSeek API key is not
+committed.</label></li>
+<li><label><input type="checkbox" />Runtime token is not
+committed.</label></li>
+<li><label><input type="checkbox" />API key is not passed through
+command-line arguments.</label></li>
+<li><label><input type="checkbox" />WebView production code does not
+store runtime bearer token.</label></li>
+<li><label><input type="checkbox" />Logs redact secrets.</label></li>
+<li><label><input type="checkbox" />Sidecar binds to
+<code>127.0.0.1</code>.</label></li>
+</ul>
+<h2 id="tests-and-checks">Tests and checks</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />Web lint passes or blocker
+documented.</label></li>
+<li><label><input type="checkbox" />Web typecheck passes or blocker
+documented.</label></li>
+<li><label><input type="checkbox" />Web tests pass or blocker
+documented.</label></li>
+<li><label><input type="checkbox" />Swift build passes or blocker
+documented.</label></li>
+<li><label><input type="checkbox" />Swift tests pass or blocker
+documented.</label></li>
+<li><label><input type="checkbox" />Fake runtime smoke test
+passes.</label></li>
+<li><label><input type="checkbox" />Real runtime smoke test is
+documented.</label></li>
+</ul>
+<h2 id="documentation">Documentation</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />README explains setup.</label></li>
+<li><label><input type="checkbox" />Settings/onboarding explains
+DeepSeek API key.</label></li>
+<li><label><input type="checkbox" />Sidecar binary discovery is
+documented.</label></li>
+<li><label><input type="checkbox" />Known limitations are
+documented.</label></li>
+<li><label><input type="checkbox" />License notice plan is
+documented.</label></li>
+</ul>
+</body>
+</html>

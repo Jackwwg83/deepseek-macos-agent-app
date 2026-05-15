@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>docs/10_SOURCE_INVENTORY.md</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">docs/10_SOURCE_INVENTORY.md</h1>
+</header>
+<h1 id="source-inventory">10 — Source Inventory</h1>
+<p>This document records the DeepSeek-TUI source details that shaped the
+app design.</p>
+<h2 id="workspace">Workspace</h2>
+<p>The uploaded <code>Cargo.toml</code> shows a Rust workspace with
+these crates:</p>
+<pre class="text"><code>agent
+app-server
+cli
+config
+core
+execpolicy
+hooks
+mcp
+protocol
+secrets
+state
+tools
+tui
+tui-core</code></pre>
+<p>The workspace version in the uploaded archive is <code>0.8.36</code>,
+Rust edition is <code>2024</code>, and rust-version is
+<code>1.88</code>.</p>
+<h2 id="runtime-api">Runtime API</h2>
+<p><code>crates/tui/src/runtime_api.rs</code> is the best current
+integration surface for a GUI. It defines local HTTP/SSE endpoints
+including:</p>
+<pre class="text"><code>GET  /health
+GET  /v1/runtime/info
+GET  /v1/sessions
+GET  /v1/workspace/status
+POST /v1/stream
+GET  /v1/threads
+POST /v1/threads
+GET  /v1/threads/summary
+GET  /v1/threads/{id}
+PATCH /v1/threads/{id}
+POST /v1/threads/{id}/resume
+POST /v1/threads/{id}/fork
+POST /v1/threads/{id}/turns
+POST /v1/threads/{id}/turns/{turn_id}/steer
+POST /v1/threads/{id}/turns/{turn_id}/interrupt
+POST /v1/threads/{id}/compact
+GET  /v1/threads/{id}/events
+POST /v1/approvals/{approval_id}
+GET  /v1/tasks
+POST /v1/tasks
+GET  /v1/skills
+POST /v1/skills/{name}
+GET  /v1/apps/mcp/servers
+GET  /v1/apps/mcp/tools
+GET  /v1/automations
+POST /v1/automations
+GET  /v1/usage</code></pre>
+<h2 id="runtime-records">Runtime records</h2>
+<p><code>crates/tui/src/runtime_threads.rs</code> includes durable
+records:</p>
+<pre class="text"><code>ThreadRecord
+TurnRecord
+TurnItemRecord
+RuntimeEventRecord
+RuntimeStoreState</code></pre>
+<p>This is a strong fit for a GUI because events are replayable and have
+monotonically increasing <code>seq</code>.</p>
+<h2 id="engine">Engine</h2>
+<p><code>crates/tui/src/core/engine.rs</code> contains the real agent
+engine and <code>EngineConfig</code>. It includes model, workspace,
+shell/trust settings, max steps, subagents, features, compaction,
+network policy, snapshots, LSP, runtime services, memory, goal
+objective, strict tool mode, workshop, and search settings.</p>
+<p>This confirms the GUI should not reimplement runtime behavior.</p>
+<h2 id="engine-event-channel-caveat">Engine event channel caveat</h2>
+<p><code>EngineHandle</code> contains:</p>
+<pre class="text"><code>rx_event: Arc&lt;RwLock&lt;mpsc::Receiver&lt;Event&gt;&gt;&gt;</code></pre>
+<p>This is a single-consumer channel wrapped in a lock, not a
+multi-client event bus. The GUI should therefore integrate through
+<code>RuntimeEventRecord</code> and Runtime API SSE, not raw engine
+events.</p>
+<h2 id="cli-dispatcher">CLI dispatcher</h2>
+<p><code>crates/cli/src/lib.rs</code> delegates many commands to the TUI
+binary, including <code>doctor</code>, <code>models</code>,
+<code>sessions</code>, <code>exec</code>, <code>review</code>,
+<code>mcp</code>, <code>features</code>, and <code>serve</code>.</p>
+<p>For the macOS app, call the runtime sidecar command directly rather
+than assuming the CLI crate is a stable app-server.</p>
+<h2 id="why-not-current-cratesapp-server">Why not current
+<code>crates/app-server</code></h2>
+<p>The uploaded source contains <code>crates/app-server</code>, but
+prior static review showed the more product-ready runtime lifecycle is
+in <code>crates/tui/src/runtime_api.rs</code> and
+<code>crates/tui/src/runtime_threads.rs</code>. For MVP, prefer
+<code>serve --http</code> sidecar.</p>
+<h2 id="design-consequence">Design consequence</h2>
+<p>The app should be a sidecar GUI:</p>
+<pre class="text"><code>Native app -&gt; Runtime adapter -&gt; DeepSeek-TUI Runtime API -&gt; DeepSeek-TUI Engine</code></pre>
+<p>not:</p>
+<pre class="text"><code>Native app -&gt; DeepSeek API directly
+Native app -&gt; terminal output scraping
+Native app -&gt; current thin app-server crate</code></pre>
+</body>
+</html>

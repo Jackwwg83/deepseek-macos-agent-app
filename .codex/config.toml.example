@@ -1,0 +1,13 @@
+# Copy selected settings into ~/.codex/config.toml or .codex/config.toml.
+# Goal mode is experimental; enable it before using CODEX_GOAL.md.
+
+[features]
+goals = true
+
+# Keep permissions conservative while Codex creates a desktop app.
+# You can loosen these after the repo has tests and checkpoints.
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+# Recommended: use a branch dedicated to this app prototype.
+# Also keep a clean git status before starting a long /goal run.
