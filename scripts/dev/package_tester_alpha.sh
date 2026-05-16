@@ -148,7 +148,7 @@ rm -f "$ZIP_PATH" "$ZIP_PATH.sha256"
 (
   cd "$BUILD_ROOT"
   ditto -c -k --sequesterRsrc --keepParent "$(basename "$PACKAGE_DIR")" "$ZIP_PATH"
-  shasum -a 256 "$ZIP_PATH" > "$ZIP_PATH.sha256"
+  shasum -a 256 "$(basename "$ZIP_PATH")" > "$ZIP_PATH.sha256"
 )
 
 echo "package-ok"

@@ -134,7 +134,10 @@ cleanup_sidecar
 trap - EXIT
 echo "packaged-sidecar-health-ok"
 
-shasum -a 256 -c "$ZIP_PATH.sha256" >/dev/null
+(
+  cd "$BUILD_ROOT"
+  shasum -a 256 -c "$(basename "$ZIP_PATH").sha256" >/dev/null
+)
 SECRET_PATTERN='DEEPSEEK_API_KEY=.*s''k-|s''k-[A-Za-z0-9_-]{16,}'
 if rg -n "$SECRET_PATTERN" "$PACKAGE_DIR" >/dev/null 2>&1; then
   echo "verify-failed: package contains an API-key-looking secret"
