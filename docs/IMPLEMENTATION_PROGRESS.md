@@ -1,37 +1,40 @@
 # Implementation Progress
 
-## 2026-05-16 — GPT Pro UI Stabilization
+## 2026-05-16 - TUI-Aligned GUI
 
-### Architecture diagnosis
+### Product Logic
 
-The current MVP is a native macOS AppKit shell hosting a WKWebView/React command center:
+The app is now scoped to the same operating model as DeepSeek-TUI:
 
-- AppKit owns the real `NSWindow`, menu commands, sidecar lifecycle, Keychain access, runtime settings, and packaged app launch.
-- WKWebView/React owns onboarding, project command center, active thread timeline, review state, settings surface, and optional demo interaction UI.
-- `deepseek-tui` remains bundled as the local sidecar runtime for tester packages.
+- User configures a DeepSeek-compatible endpoint, API key, model, and workspace.
+- User works in a thread-first interface.
+- The model drives work through tool calls.
+- The client displays tool calls, permission requests, tool results, and assistant output.
+- The client does not own code review, file apply, git commit, automations, or skills workflows.
 
-This matches the stabilization-pack Stage 1 path: stabilize the existing hybrid UI first, then move more shell controls native in later alphas.
+### Implemented
 
-### Implemented stabilization items
+- Rewrote the Codex product goal into a TUI-aligned PRD.
+- Rewrote the acceptance checklist around setup, thread workbench, TUI mode, approval policy, tool timeline, settings, and diagnostics.
+- Replaced the WebView UI with First Run Setup, Thread Workbench, Runtime Inspector, and Runtime Settings.
+- Removed primary navigation and state for Project Command Center, Review Changes, Automations, and Skills.
+- Removed native Review menu dispatch.
+- Changed Demo Mode to stream a TUI-style `exec_shell` tool call, approval card, and tool result instead of fake review files.
+- Added scoped auto-allow rule display for `Always allow in this workspace`.
+- Updated packaged WebView probes to validate Thread Workbench and approval flow.
 
-- Removed fake in-content macOS traffic lights; the live app uses real native window chrome.
-- Reworked the WebView UI into First Run Setup, Project Command Center, Active Thread, Review Changes, and Settings & Usage screens.
-- Added intentional empty states for new chat and no-change review.
-- Made visible controls either active or disabled with a reason/title.
-- Added accessible labels to setup fields, model selectors, demo toggle, settings toggles, and accent controls.
-- Changed Keychain access to use a stable service/account and silent non-interactive reads.
-- Stopped reading Keychain during app launch unless an environment key is explicitly supplied for scripted real-runtime startup.
-- Added in-app API key setup, rotate-key, delete-key, model persistence, diagnostics, and optional Demo Mode.
-- Fixed the WK bridge request path so reply-style and callback-style native handlers do not double-post.
-- Disabled direct WebView event push by default after native testing showed it could freeze WebKit during reply handling; the UI now refreshes runtime state through thread-detail polling while the runtime still records the event stream.
-- Kept direct event push available only for explicit debugging with `DEEPSEEK_AGENT_ENABLE_WEBVIEW_EVENT_PUSH=1`.
+### Validation
 
-### Current validation status
+Completed validation:
 
-- First Run Setup defaults to real URL/key/model setup; Demo Mode is opt-in for offline diagnostics.
-- Demo Mode works with no API key when explicitly enabled.
-- Real packaged app launch reaches the project command center with the configured endpoint, key, and model.
-- Real runtime model-turn smoke completes against the configured DeepSeek-compatible endpoint.
-- Packaged app launches locally and renders the v2 UI.
-- Packaged app interaction probe completes setup, creates a fresh thread, sends a prompt, sees the approval card, clicks Allow, and observes the final approval-granted assistant text.
-- Full local check suite passes.
+- `npm --prefix web test`: 5 files, 19 tests passed.
+- `npm --prefix web run lint`: passed.
+- `npm --prefix web run typecheck`: passed.
+- `npm --prefix web run build`: passed.
+- `swift test`: 31 XCTest cases passed inside `bash scripts/dev/check.sh`.
+- `bash scripts/dev/check.sh`: reported `check-ok`.
+- `bash scripts/dev/verify_tester_alpha.sh`: reported `packaged-app-render-ok`, `packaged-sidecar-health-ok`, and `verify-tester-alpha-ok`.
+- `DEEPSEEK_AGENT_WEBVIEW_INTERACTION_PROBE=1 bash scripts/dev/verify_tester_alpha.sh`: reported `packaged-app-interaction-ok`, `packaged-sidecar-health-ok`, and `verify-tester-alpha-ok`.
+- Packaged window screenshot captured at `/tmp/deepseek-agent-tui-aligned-window-final.png`.
+
+Computer Use was attempted but could not attach because the accessibility bridge reports zero windows for the visible packaged app while CoreGraphics reports the onscreen window. This is documented in `docs/UI_QA_RESULTS.md`.

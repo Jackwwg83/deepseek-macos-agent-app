@@ -2,110 +2,132 @@
 
 Date: 2026-05-16
 
-## Visual QA
+Result: PASS with a Computer Use attachment blocker documented below.
 
-- Window capture: `/tmp/deepseek-agent-window.png`
-- Alpha.7 root-layer recheck capture: `/tmp/deepseek-agent-alpha7-window.png`
-- Result: PASS
+## Product Direction
 
-Observed in the packaged app window:
+The current GUI is aligned to the DeepSeek-TUI operating model:
+
+- First Run Setup configures endpoint, key, model, workspace, and optional Demo Mode.
+- Thread Workbench is the primary surface.
+- Model work appears as user, assistant, tool, approval, and tool-result timeline items.
+- Risky tool execution is controlled by `Allow once`, `Always allow in this workspace`, `Deny`, and `Stop`.
+- `Always allow in this workspace` persists a scoped rule and auto-approves later matching tool requests.
+- Runtime Settings owns endpoint, key rotation, model defaults, TUI mode, approval policy, diagnostics, and workspace boundary.
+- The app does not expose client-owned Review, Apply, Reject, Commit, Automations, or Skills product workflows.
+
+## Visual QA Scope
+
+Observed requirements for the packaged macOS window:
 
 - Real macOS chrome is present.
-- No fake red/yellow/green traffic lights are rendered inside the WebView content.
+- No fake traffic lights are rendered inside the WebView content.
 - No blue/purple background bleed is visible inside the app window.
-- First Run Setup no longer has a nested window/card shell around the main layout; the rail and setup content fill the real macOS window.
-- Sidebar and inspector backgrounds use neutral gray-white surfaces rather than a blue outer frame.
-- First Run Setup uses the v2 light Codex-inspired visual system.
-- Sidebar/setup card and main content align cleanly.
+- First Run Setup and Thread Workbench fill the real macOS window without a nested app shell.
+- Sidebar, thread surface, and inspector use neutral gray-white surfaces.
 - DeepSeek-only model names are shown.
-- Alpha.7 recheck: the app content fills the real macOS window. The only pixels outside the white content area are native macOS titlebar/window corner/shadow pixels, not a WebView root shell or blue app background.
 
-## Native interaction probe
+Evidence:
+
+- Window capture: `/tmp/deepseek-agent-user-smoke-window-latest.png`
+- Zip-download simulation WebView probe: `/tmp/deepseek-agent-user-smoke-probe.json`
+- CoreGraphics window: owner `DeepSeek Agent`, layer `0`, bounds `1536x992`.
+
+## Native Interaction Probe
 
 Command: packaged app with `DEEPSEEK_AGENT_WEBVIEW_INTERACTION_PROBE=1`
 
-Result: PASS
+Probe result: PASS.
 
-Probe evidence:
+Verified behavior:
+
+- Enable Demo Mode.
+- Complete setup without an API key.
+- Reach `Thread Workbench`.
+- Create a new thread.
+- Send the `Explain this project` starter prompt.
+- See `Run local verification`.
+- Click `Allow once`.
+- Observe `Approval granted`.
+- Observe `Tool result`.
+- Repeat with `Deny`.
+- Repeat with `Stop`.
+- Repeat with `Always allow in this workspace`.
+- Send another matching prompt and observe saved-rule auto-approval.
+- Confirm old client-owned Review/Apply/Commit workflow text is absent.
+
+Probe evidence fields:
 
 - `completedSetup: true`
 - `freshThreadNoFiles: true`
 - `sentPrompt: true`
 - `sawApproval: true`
 - `approved: true`
-- `reviewedChanges: true`
+- `denied: true`
+- `stopped: true`
+- `alwaysAllowed: true`
+- `autoAllowedFuture: true`
+- `sawToolResult: true`
+- `noClientCommitWorkflow: true`
 - `interactionPassed: true`
 
-The probe actively enabled Demo Mode, completed setup without an API key, created a new thread, confirmed the thread has no changed files, sent `Explain this project`, waited for `Run local verification`, clicked `Allow once`, observed `Approval granted`, opened `Review changes`, selected `web/src/embedded/chat/App.tsx`, clicked `Apply selected`, and confirmed `Commit 1 file` is available. This is an offline regression check only; the tester path is real URL/key/model setup.
-
-## Real runtime probe
-
-Command: packaged app launched with user-supplied `DEEPSEEK_BASE_URL`, `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, and `DEEPSEEK_AGENT_RUNTIME=real`
-
-Result: PASS
-
-Probe evidence:
-
-- Main screen reached `Project Command Center`.
-- Runtime mode rendered as `real`.
-- Runtime version rendered as `0.8.37`.
-- Model rendered as `deepseek-v4-flash`.
-- API key status rendered as `Configured`.
-- No `BOOTING` or `Loading thread` state persisted.
-
-A separate bundled-sidecar model-turn smoke completed against the configured DeepSeek-compatible endpoint and model.
-
-## Button and state coverage
+## Button and State Coverage
 
 Automated tests cover:
 
 - `Complete Setup` in Demo Mode.
+- API-key requirement before real-mode setup.
 - `New thread`.
 - starter prompt buttons.
-- empty-prompt disabled `Send prompt`.
-- active `Send prompt` with text.
-- `Review changes` no-change state.
-- disabled `Open in editor`, `Apply selected`, `Reject selected`, and `Commit 0 files`.
-- Settings entry.
-- Settings model picker.
-- Settings toggles.
-- `Run diagnostics`.
-- `Rotate key` sheet.
+- disabled empty-prompt send state.
+- active prompt send.
+- TUI mode selector.
+- approval policy selector.
+- workspace boundary display.
 - approval `Allow once`.
-- approval `Deny` and `Stop task`.
-- Automations and Skills skeleton pages.
-- generated review files, `Apply selected`, `Reject selected`, and commit enablement after accepted files.
-- real-runtime API key status label.
+- approval `Always allow in this workspace`.
+- saved-rule auto-approval after `Always allow in this workspace`.
+- auto-allow rule clearing.
+- approval `Deny`.
+- approval `Stop`.
+- Runtime Settings entry.
+- settings model picker.
+- diagnostics.
+- API-key rotation sheet.
+- DeepSeek-only model list.
+- visible HTTP warning for remote `http://` self-hosted endpoints.
+- absence of old Review/Apply/Commit/Automations/Skills navigation.
+- absence of fake macOS traffic lights inside the WebView.
 
-## Computer Use desktop validation
+## Computer Use Desktop Validation
 
-Computer Use was first blocked by a WindowServer/AX session error, then recovered after a fresh packaged-app launch and was used for live desktop validation.
+Computer Use validation was attempted against the packaged app using the app name, bundle id, and full app path. All attempts returned:
 
-Result: PASS
-
-Evidence:
-
-- `get_app_state` attached to the packaged `DeepSeek Agent.app` WebView and returned the live accessibility tree.
-- Setup: toggled Demo Mode and completed setup without an API key.
-- Project Command Center: confirmed runtime status, DeepSeek-only model, and neutral full-window layout.
-- Thread: created a new thread, selected `Explain this project`, sent the prompt, and reached `Run local verification`.
-- Approval: clicked `Allow once`; the card changed to `Approved`, and Stop/Deny/Allow buttons disappeared after completion.
-- Review: opened review, selected `web/src/embedded/chat/App.tsx`, clicked `Apply selected`, and confirmed `Commit 1 file` enabled.
-- Automations: opened the skeleton page, clicked `View planned templates`, and verified unimplemented scheduler controls are disabled.
-- Skills: opened the skeleton page, clicked `Browse planned skills`, and verified unimplemented import/validate controls are disabled.
-- Settings: opened diagnostics, Rotate key, and Manage account flows; verified no macOS Keychain password prompt appeared.
-
-After the alpha.7 version/root-layer patch, Computer Use returned `cgWindowNotFound` for a newly relaunched package even though the macOS window list showed an onscreen `DeepSeek Agent` window. The alpha.7 visual recheck therefore used a window-level screenshot capture plus the packaged render probe. The prior live Computer Use product journey remains valid because the patch only changed version metadata, fallback/native background colors, and user-agent text.
-
-## Commands run
-
-```bash
-npm run lint
-npm run typecheck
-npm test
-swift test
-bash scripts/dev/check.sh
-bash scripts/dev/verify_tester_alpha.sh
+```text
+Computer Use server error -10005: cgWindowNotFound
 ```
 
-All listed commands passed.
+Additional evidence:
+
+- `list_apps` showed `DeepSeek Agent` running.
+- System Events saw the process as visible but reported `count of windows = 0`.
+- CoreGraphics simultaneously reported an onscreen `DeepSeek Agent` window.
+- Window-level screenshot capture succeeded at `/tmp/deepseek-agent-user-smoke-window-latest.png`.
+
+Conclusion: the app launches and renders, but the Computer Use/AX attachment path is blocked in this environment. Native smoke is covered by packaged WebView interaction probe plus direct window screenshot evidence.
+
+## Live Runtime Smoke
+
+The bundled `deepseek-tui serve` runtime was launched against the self-hosted DeepSeek-compatible endpoint `https://iruidong.com/v1` with model `deepseek-v4-flash`. A no-tool prompt that did not contain the exact target token completed with an agent message containing `REAL_RUNTIME_SMOKE_OK`.
+
+## Commands
+
+```bash
+npm --prefix web run lint
+npm --prefix web run typecheck
+npm --prefix web test
+npm --prefix web run build
+bash scripts/dev/check.sh
+bash scripts/dev/verify_tester_alpha.sh
+DEEPSEEK_AGENT_WEBVIEW_INTERACTION_PROBE=1 bash scripts/dev/verify_tester_alpha.sh
+```

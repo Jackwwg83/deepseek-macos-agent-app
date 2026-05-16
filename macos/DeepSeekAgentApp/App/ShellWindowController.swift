@@ -38,6 +38,9 @@ final class ShellWindowController: NSWindowController {
         window.isOpaque = true
         window.backgroundColor = .white
         window.minSize = NSSize(width: 1180, height: 720)
+        window.setAccessibilityElement(true)
+        window.setAccessibilityRole(.window)
+        window.setAccessibilityTitle("DeepSeek Agent")
         super.init(window: window)
         window.contentView = makeRootView()
         refreshStatus()
@@ -239,10 +242,6 @@ final class ShellWindowController: NSWindowController {
 
     @objc func settingsMenu(_ sender: Any?) {
         dispatchWebCommand("settings")
-    }
-
-    @objc func reviewMenu(_ sender: Any?) {
-        dispatchWebCommand("review")
     }
 
     @objc func stopCurrentTurnMenu(_ sender: Any?) {

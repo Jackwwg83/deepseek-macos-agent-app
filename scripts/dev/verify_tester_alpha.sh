@@ -63,6 +63,7 @@ fi
 
 LOG="/tmp/deepseek-agent-packaged-app.log"
 PROBE="/tmp/deepseek-agent-packaged-app-probe.json"
+INTERACTION_PROBE="${DEEPSEEK_AGENT_WEBVIEW_INTERACTION_PROBE:-0}"
 rm -f "$LOG" "$PROBE"
 rm -rf "$HOME/Library/Saved Application State/app.deepseek.agent.savedState"
 DEEPSEEK_AGENT_RUNTIME=fake DEEPSEEK_AGENT_WEBVIEW_PROBE_PATH="$PROBE" "$APP_EXEC" >"$LOG" 2>&1 &
@@ -74,13 +75,21 @@ cleanup_app() {
 }
 trap cleanup_app EXIT
 APP_OK=0
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+APP_WAIT_ATTEMPTS=12
+if [ "$INTERACTION_PROBE" = "1" ]; then
+  APP_WAIT_ATTEMPTS=36
+fi
+for _ in $(seq 1 "$APP_WAIT_ATTEMPTS"); do
   if ! kill -0 "$PID" >/dev/null 2>&1; then
     echo "packaged-app-launch-failed"
     sed -n '1,160p' "$LOG"
     exit 1
   fi
-  if [ -f "$PROBE" ] && rg -q '"containsV2Shell":true' "$PROBE" && rg -q '"rootHTMLLength":[1-9][0-9]*' "$PROBE"; then
+  if [ "$INTERACTION_PROBE" = "1" ] && [ -f "$PROBE" ] && rg -q '"interactionPassed":true' "$PROBE"; then
+    APP_OK=1
+    break
+  fi
+  if [ "$INTERACTION_PROBE" != "1" ] && [ -f "$PROBE" ] && rg -q '"containsV2Shell":true' "$PROBE" && rg -q '"rootHTMLLength":[1-9][0-9]*' "$PROBE"; then
     APP_OK=1
     break
   fi
@@ -94,7 +103,11 @@ if [ "$APP_OK" != "1" ]; then
 fi
 cleanup_app
 trap - EXIT
-echo "packaged-app-render-ok"
+if [ "$INTERACTION_PROBE" = "1" ]; then
+  echo "packaged-app-interaction-ok"
+else
+  echo "packaged-app-render-ok"
+fi
 
 PORT="${DEEPSEEK_AGENT_PACKAGE_SMOKE_PORT:-18789}"
 TOKEN="codex-package-smoke-token"

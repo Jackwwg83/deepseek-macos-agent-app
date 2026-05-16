@@ -24,8 +24,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installMainMenu(target: controller)
         controller.window?.center()
         controller.window?.makeKeyAndOrderFront(nil)
+        controller.window?.makeMain()
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
+        NSRunningApplication.current.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -106,10 +108,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         agentMenu.addItem(targetedItem("Use Demo Runtime", action: #selector(ShellWindowController.demoRuntimeMenu(_:)), keyEquivalent: "", target: target))
         agentMenu.addItem(targetedItem("Open Command Palette", action: #selector(ShellWindowController.commandPaletteMenu(_:)), keyEquivalent: "", target: target))
         addSubmenu(agentMenu, to: mainMenu, title: "Agent")
-
-        let reviewMenu = NSMenu(title: "Review")
-        reviewMenu.addItem(targetedItem("Review Changes", action: #selector(ShellWindowController.reviewMenu(_:)), keyEquivalent: "r", target: target))
-        addSubmenu(reviewMenu, to: mainMenu, title: "Review")
 
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m"))

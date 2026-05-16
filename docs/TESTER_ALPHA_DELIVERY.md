@@ -30,12 +30,16 @@ Steps:
 
 1. Unzip `DeepSeek-Agent-alpha-macos.zip`.
 2. Open `DeepSeek Agent.app`.
-3. Complete the First Run Setup screen.
+3. Complete First Run Setup.
 4. Enter the DeepSeek URL, API key, and model, then click `Complete Setup`.
-5. The app saves the API key to macOS Keychain and clears the setup field after submit.
-6. Optional: enable Demo Mode only for offline UI diagnostics without a real endpoint.
+5. Work from `Thread Workbench`.
+6. Approve, always approve, deny, or stop model tool requests with the approval card.
 
 The app bundles `deepseek-tui`; testers do not need Rust, Node, Xcode, or a separate DeepSeek-TUI install.
+
+## Product Boundary
+
+The GUI follows DeepSeek-TUI behavior. The app does not expose separate client-owned Review, Apply, Commit, Automations, or Skills workflows. Code changes, tests, shell commands, diffs, and commits should appear through model tool calls and permission requests.
 
 ## Security Notes
 
@@ -72,18 +76,21 @@ DeepSeek Agent.app/Contents/Resources/THIRD_PARTY_NOTICES.txt
 - `bin/deepseek-tui` is bundled and executable.
 - Third-party notices and license are present.
 - Ad-hoc code signature verifies when `codesign` is available.
-- Packaged app launches in fake mode and renders the embedded WebView through the native bridge.
+- Packaged app launches in Demo Mode and renders the embedded WebView through the native bridge.
+- Packaged app interaction probe completes Demo setup, prompt send, `Allow once`, `Deny`, `Stop`, `Always allow in this workspace`, and subsequent saved-rule auto-approval.
 - Bundled DeepSeek-TUI sidecar responds to `/health`.
 - Zip checksum verifies.
-- Package text does not contain the provided concrete API key or private endpoint.
+- Package text does not contain API-key-looking secrets.
 
 Current closeout evidence:
 
 - `bash scripts/dev/check.sh` reports `check-ok`.
 - `bash scripts/dev/verify_tester_alpha.sh` reports `packaged-app-render-ok`, `packaged-sidecar-health-ok`, and `verify-tester-alpha-ok`.
-- A real bundled-sidecar model-turn smoke completed against a third-party OpenAI-compatible HTTPS endpoint using a user-supplied key and model.
-- A real packaged-app launch probe reached `real` mode with the configured model and API key status shown as configured.
-- Optional Demo Mode interaction probe reports `interactionPassed: true` for setup, new thread, send prompt, approval card, `Allow once`, `Review changes`, file selection, `Apply selected`, and `Commit 1 file` enablement.
+- `DEEPSEEK_AGENT_WEBVIEW_INTERACTION_PROBE=1 bash scripts/dev/verify_tester_alpha.sh` reports `packaged-app-interaction-ok`, `packaged-sidecar-health-ok`, and `verify-tester-alpha-ok`.
+- Live self-hosted DeepSeek-compatible smoke passes with `https://iruidong.com/v1`, model `deepseek-v4-flash`, and a no-tool prompt; the agent message returned `REAL_RUNTIME_SMOKE_OK`.
+- Zip-download simulation verifies checksum, code signature, and first-run render from `/tmp/deepseek-agent-user-smoke/DeepSeek-Agent-alpha-macos/DeepSeek Agent.app`.
+- Packaged app screenshot: `/tmp/deepseek-agent-user-smoke-window-latest.png`.
+- Computer Use cannot attach in this environment because Accessibility reports zero windows while CoreGraphics reports the onscreen app window. This does not block tester launch, but it is a local automation limitation to revisit.
 
 See also:
 

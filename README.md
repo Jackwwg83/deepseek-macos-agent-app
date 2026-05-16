@@ -1,6 +1,6 @@
 # DeepSeek Agent for macOS
 
-DeepSeek Agent is a local-first macOS desktop app for running DeepSeek-TUI through a native shell and Codex-inspired command center UI.
+DeepSeek Agent is a local-first macOS desktop app for running DeepSeek-TUI through a native shell and a TUI-aligned GUI.
 
 It bundles the web UI and a `deepseek-tui` sidecar. Test users do not need to install Rust, Node, Xcode, or DeepSeek-TUI separately.
 
@@ -8,7 +8,7 @@ It bundles the web UI and a `deepseek-tui` sidecar. Test users do not need to in
 
 Latest tester alpha:
 
-[DeepSeek Agent v0.1.0-alpha.7](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.7)
+[DeepSeek Agent v0.1.0-alpha.8](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.8)
 
 Download:
 
@@ -60,12 +60,12 @@ The bundled sidecar is used by default.
 ## What Is Included
 
 - SwiftPM/AppKit macOS app shell
-- First Run Setup, Project Command Center, Active Thread, Review Changes, and Settings & Usage screens
+- First Run Setup, Thread Workbench, approval cards, runtime inspector, and Runtime Settings screens
 - API-key storage through macOS Keychain
-- WKWebView command center UI
+- WKWebView thread workbench UI
 - React/TypeScript embedded UI
 - Real DeepSeek-TUI HTTP/SSE runtime adapter
-- Optional Demo Mode runtime for offline UI testing
+- Optional Demo Mode runtime for offline thread/tool/approval testing
 - Bundled `deepseek-tui` sidecar in the tester package
 - Package verification scripts and checksums
 
@@ -138,14 +138,14 @@ The current tester package is validated with:
 
 - `bash scripts/dev/check.sh`
 - `bash scripts/dev/verify_tester_alpha.sh`
-- real packaged app launch probe with configured URL/key/model
-- packaged app interaction probe for optional Demo Mode setup, new thread, prompt send, approval card, `Allow once`, Review Changes, `Apply selected`, and `Commit 1 file` enablement
+- `DEEPSEEK_AGENT_WEBVIEW_INTERACTION_PROBE=1 bash scripts/dev/verify_tester_alpha.sh`
+- packaged app interaction probe for optional Demo Mode setup, new thread, prompt send, `exec_shell` approval card, `Allow once`, and `Tool result` completion
 - native startup readiness retry tests
 - packaged app WebView render probe
 - bundled sidecar `/health` smoke
-- real sidecar model-turn smoke with a user-supplied DeepSeek-compatible endpoint
 - package checksum verification
 - package secret scan
+- direct packaged-window screenshot capture when Computer Use cannot attach to the local accessibility window
 
 ## Known Limitations
 

@@ -116,14 +116,19 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
             let steps: [(TimeInterval, () -> Void)] = [
                 (0.10, { self.emitLocked(threadId: threadId, event: "item.started", payload: .object(["itemId": .string(assistantItemId), "kind": .string("assistant"), "title": .string("DeepSeek")]), turnId: turnId) }),
                 (0.22, { self.emitLocked(threadId: threadId, event: "item.delta", payload: .object(["itemId": .string(assistantItemId), "delta": .string("I inspected the local project context. ")]), turnId: turnId) }),
-                (0.34, { self.emitLocked(threadId: threadId, event: "item.delta", payload: .object(["itemId": .string(assistantItemId), "delta": .string("The native shell is proxying this fake runtime flow. ")]), turnId: turnId) }),
-                (0.46, { self.emitLocked(threadId: threadId, event: "item.started", payload: .object(["itemId": .string(toolItemId), "kind": .string("tool"), "title": .string("Command preview"), "content": .string("bash scripts/dev/check.sh")]), turnId: turnId) }),
+                (0.34, { self.emitLocked(threadId: threadId, event: "item.delta", payload: .object(["itemId": .string(assistantItemId), "delta": .string("The native shell is proxying this TUI-style tool flow. ")]), turnId: turnId) }),
+                (0.46, { self.emitLocked(threadId: threadId, event: "item.started", payload: .object([
+                    "itemId": .string(toolItemId),
+                    "kind": .string("tool"),
+                    "title": .string("exec_shell"),
+                    "content": .string("Command: bash scripts/dev/check.sh\ncwd: current workspace\nstatus: waiting for approval")
+                ]), turnId: turnId) }),
                 (0.58, { self.emitLocked(threadId: threadId, event: "item.completed", payload: .object(["itemId": .string(toolItemId)]), turnId: turnId) }),
                 (0.70, { self.emitLocked(threadId: threadId, event: "approval.required", payload: .object([
                     "itemId": .string(approvalItemId),
                     "approvalId": .string(approvalId),
                     "title": .string("Run local verification"),
-                    "toolName": .string("shell"),
+                    "toolName": .string("exec_shell"),
                     "actionType": .string("command"),
                     "cwd": .string(projectPath),
                     "command": .string("bash scripts/dev/check.sh"),
@@ -142,6 +147,16 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
     func interruptTurn(threadId: String, turnId: String) async throws -> RuntimeTurn {
         queue.async {
             self.emitLocked(threadId: threadId, event: "turn.interrupt_requested", payload: .object(["turnId": .string(turnId)]), turnId: turnId)
+            self.emitLocked(threadId: threadId, event: "item.failed", payload: .object([
+                "itemId": .string("\(turnId)-approval"),
+                "message": .string("Task stopped before approval.")
+            ]), turnId: turnId)
+            self.emitLocked(threadId: threadId, event: "item.delta", payload: .object([
+                "itemId": .string("\(turnId)-assistant"),
+                "delta": .string("Task stopped before running the command.")
+            ]), turnId: turnId)
+            self.emitLocked(threadId: threadId, event: "item.completed", payload: .object(["itemId": .string("\(turnId)-assistant")]), turnId: turnId)
+            self.emitLocked(threadId: threadId, event: "turn.completed", payload: .object(["turnId": .string(turnId)]), turnId: turnId)
         }
         return RuntimeTurn(id: turnId, threadId: threadId, status: "interrupted")
     }
@@ -173,10 +188,20 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
 
             let turnId = approvalId.replacingOccurrences(of: "-approval-id", with: "")
             let assistantItemId = "\(turnId)-assistant"
+            let toolResultItemId = "\(turnId)-tool-result"
             self.emitLocked(threadId: record.thread.id, event: "approval.decided", payload: .object([
                 "approvalId": .string(approvalId),
                 "decision": .string(decision)
             ]), turnId: turnId)
+            if decision == "allow" {
+                self.emitLocked(threadId: record.thread.id, event: "item.started", payload: .object([
+                    "itemId": .string(toolResultItemId),
+                    "kind": .string("tool"),
+                    "title": .string("Tool result"),
+                    "content": .string("exit_code: 0\nsummary: local verification completed in Demo Mode")
+                ]), turnId: turnId)
+                self.emitLocked(threadId: record.thread.id, event: "item.completed", payload: .object(["itemId": .string(toolResultItemId)]), turnId: turnId)
+            }
             self.emitLocked(threadId: record.thread.id, event: "item.delta", payload: .object([
                 "itemId": .string(assistantItemId),
                 "delta": .string(decision == "allow" ? "Approval granted. The demo check completed cleanly." : "Approval denied. I stopped before running the command.")
@@ -289,6 +314,14 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
             }
             return items.map { item in
                 item.id == itemId ? TimelineItem(id: item.id, kind: item.kind, title: item.title, content: item.content, status: "completed", approval: item.approval) : item
+            }
+        case "item.failed":
+            guard case .string(let itemId) = payload["itemId"],
+                  case .string(let message) = payload["message"] else {
+                return items
+            }
+            return items.map { item in
+                item.id == itemId ? TimelineItem(id: item.id, kind: item.kind, title: item.title, content: message, status: "failed", approval: item.approval) : item
             }
         case "approval.required":
             guard case .string(let itemId) = payload["itemId"],

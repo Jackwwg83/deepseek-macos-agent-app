@@ -1,127 +1,125 @@
-# 验收清单
+# TUI-Aligned Acceptance Checklist
 
-## 1. 启动与窗口
+Status: PASS on 2026-05-16.
 
-- [x] App 可以启动。
-- [x] 使用真实 macOS window chrome。
-- [x] 内容区没有 fake 红黄绿按钮。
-- [x] 内容区没有大面积蓝紫背景泄漏。
-- [x] Sidebar/main/inspector 填满窗口。
-- [x] 窗口 resize 后布局不崩。
+## 1. Launch and Window
 
-## 2. First Run / Setup
+- [x] App launches locally.
+- [x] Uses real macOS window chrome.
+- [x] Content area has no fake traffic-light controls.
+- [x] Content area has no blue/purple background bleed.
+- [x] Sidebar, timeline, and inspector fill the available window.
+- [x] Resize/layout constraints are covered by fixed shell min size and responsive WebView layout.
 
-- [x] 没配置时进入 First Run Setup。
-- [x] API key 输入框可输入。
-- [x] Demo Mode toggle 可用。
-- [x] 选择模型只出现 `deepseek-v4-flash` 和 `deepseek-v4-pro`。
-- [x] Workspace Browse 可打开 folder picker 或 demo placeholder。
-- [x] Complete Setup 后进入 Project Command Center。
-- [x] 不弹系统登录钥匙串密码框。
+## 2. First Run Setup
 
-## 3. Project Command Center
+- [x] No saved configuration opens First Run Setup.
+- [x] DeepSeek URL input accepts `https://` and self-hosted `http://` endpoints.
+- [x] API key input accepts a key and does not write it into a plain config file.
+- [x] Model selector only shows DeepSeek models.
+- [x] Workspace path is visible and editable with a clearly labeled Browse fallback.
+- [x] Demo Mode works without an API key.
+- [x] Complete Setup lands on the thread workbench, not Project Command Center.
+- [x] No system Keychain password prompt appears during normal setup.
 
-- [x] 左侧项目可选择。
-- [x] New thread 可点击。
-- [x] Suggested prompt 可点击或明确 disabled。
-- [x] Quick actions 有行为或 disabled reason。
-- [x] Runtime status 可见。
-- [x] 无数据时显示空状态。
+## 3. Thread Workbench
 
-## 4. Active Thread
+- [x] Left sidebar is thread/workspace oriented.
+- [x] There is no primary `Project Command Center` entry.
+- [x] There is no primary `Review Changes` entry.
+- [x] There are no primary placeholder `Automations` or `Skills` entries.
+- [x] New thread is available and creates/selects a thread.
+- [x] Empty thread state tells the user to send a prompt.
+- [x] Prompt input remains responsive.
+- [x] Empty prompt keeps Send disabled.
+- [x] Non-empty prompt enables Send.
+- [x] Running turn shows Stop.
 
-- [x] 新 thread 显示合理空状态。
-- [x] Prompt 输入不卡顿。
-- [x] Send 在空 prompt 时 disabled。
-- [x] 输入 prompt 后 Send enabled。
-- [x] Demo Mode 发送后出现 fake agent response。
-- [x] Running 时 Send 转为 Stop 或 disabled。
-- [x] Tool/file/terminal cards 正常显示 fake events。
-- [x] Stop turn 可用或 disabled with reason。
+## 4. TUI Modes and Policies
 
-## 5. Approval
+- [x] Active mode is visible as `Plan`, `Agent`, or `YOLO`.
+- [x] `Plan` is labeled read-only investigation.
+- [x] `Agent` is labeled tool use with approvals.
+- [x] `YOLO` is visually marked as trusted auto-approval/dangerous.
+- [x] Approval policy is visible as suggest/auto/never.
+- [x] Workspace boundary and sandbox/trust summary are visible.
+- [x] Settings can change mode/policy locally.
+- [x] `Always allow in this workspace` auto-approves later matching tool requests.
+- [x] Saved auto-allow rules can be cleared from the UI.
 
-- [x] Approval card 能展示操作类型、目标、风险。
-- [x] Allow once 可改变状态。
-- [x] Deny 可改变状态。
-- [x] Stop task 可中断。
-- [x] 没有 pending approval 时不显示 approval buttons。
+## 5. Tool Timeline
 
-## 6. Review Changes
+- [x] Demo Mode sends a TUI-like event sequence: user message, assistant/status, tool call, approval, tool result, assistant response.
+- [x] Tool cards show tool name, status, command/input summary, cwd/target when available, and output summary.
+- [x] Large output is summarized rather than blocking the entire UI.
+- [x] Tool status transitions are visible.
+- [x] The UI does not fabricate review files.
+- [x] The UI does not show client-owned Apply/Reject/Commit controls.
 
-- [x] 没有变更时不显示假 diff。
-- [x] 没有变更时 review actions disabled。
-- [x] 有 fake changed files 时文件列表可选择。
-- [x] 选中文件后 diff 或 diff placeholder 显示。
-- [x] Apply selected 改变文件 review 状态。
-- [x] Reject selected 改变文件 review 状态。
-- [x] Commit 0 files 不允许是 primary enabled。
-- [x] Commit 有文件和 message 后 enabled。
+## 6. Approval Flow
 
-## 7. Settings & Usage
+- [x] Approval card shows action type, tool, target, expected side effect, command when present, and risk.
+- [x] Pending approval exposes `Allow once`.
+- [x] Pending approval exposes `Always allow in this workspace`.
+- [x] Pending approval exposes `Deny`.
+- [x] Pending approval exposes `Stop`.
+- [x] Allow once records an approved decision.
+- [x] Always allow records an approved decision and a scoped local auto-allow rule in Demo Mode.
+- [x] Future matching tool requests are auto-approved by the saved scoped rule.
+- [x] Deny records a denied decision.
+- [x] Stop cancels or marks the pending task stopped.
+- [x] Pending buttons disappear after a decision.
 
-- [x] Settings 页面可打开。
-- [x] API key save/update/delete 有行为或 mock。
-- [x] 不出现 Codex/OpenAI 模型名。
-- [x] Model dropdown 可持久化选择。
-- [x] Workspace preference toggles 可点击并保存。
-- [x] Theme/accent 控件可点击或 disabled。
-- [x] Usage 显示 demo 或 real 数据。
-- [x] Runtime diagnostics 有行为或 disabled reason。
+## 7. Settings and Diagnostics
 
-## 8. Automations / Skills
+- [x] Settings page opens.
+- [x] DeepSeek URL/model can be saved.
+- [x] API key save/update/delete has behavior or an explicit unavailable state.
+- [x] TUI mode selector is visible.
+- [x] Approval policy selector is visible.
+- [x] Runtime capabilities/features are shown when available.
+- [x] Diagnostics refresh is wired.
+- [x] Runtime unavailable state is explicit and recoverable.
+- [x] Demo Mode is clearly labeled as local simulation.
 
-- [x] 页面可打开。
-- [x] Skeleton/empty state 清楚。
-- [x] 未实现操作标记 Coming soon，不影响主流程。
+## 8. DeepSeek-Only Product Language
 
-## 9. Keychain
+- [x] No OpenAI/Codex/Anthropic/Gemini provider names appear in user-facing provider UI.
+- [x] The product is named DeepSeek Agent.
+- [x] Empty states guide the next TUI-aligned step.
+- [x] Error states explain cause and action.
 
-- [x] 保存 key 不写入普通 config 文件。
-- [x] 启动读取 key 不触发系统密码框。
-- [x] Key 缺失时显示 API key required。
-- [x] Key 删除后状态正确。
+## 9. Automated Checks
 
-## 10. Runtime Adapter
+- [x] Web unit/interaction tests pass.
+- [x] Swift/native tests pass.
+- [x] Sidecar smoke passes.
+- [x] Packaging verification passes.
 
-- [x] FakeRuntimeAdapter 可完整跑通。
-- [x] Real runtime unavailable 时不崩溃。
-- [x] Runtime error 有明确文案和 fallback。
-- [x] Sidecar status 可见。
+## 10. Native Smoke
 
-## 11. 性能
+- [x] Packaged native app launches.
+- [x] Setup can complete in Demo Mode without an API key.
+- [x] Post-setup screen is thread workbench.
+- [x] Send prompt shows tool and approval flow.
+- [x] Allow once path works.
+- [x] Always allow path works.
+- [x] Deny path works.
+- [x] Stop path works.
+- [x] Settings/Diagnostics can be opened and controls are either wired or disabled with reasons.
 
-- [x] 打字无明显卡顿。
-- [x] 页面切换无明显卡顿。
-- [x] fake runtime 连续推送事件时 UI 仍可交互。
-- [x] 没有 diff 时不加载重型 diff viewer。
-- [x] 大输出不会导致整个 App 卡死。
+## Closeout Evidence
 
-## 12. 视觉
+Build command: `npm --prefix web run build`, `swift build`, and `bash scripts/dev/package_tester_alpha.sh`
 
-- [x] 使用 v2 Codex-inspired light 风格。
-- [x] 主要背景是白/浅灰/轻透明，不是厚重蓝色画布。
-- [x] Card 间距统一。
-- [x] Sidebar 选中态清楚。
-- [x] 右侧 Inspector 不拥挤。
-- [x] Disabled buttons 视觉明显。
-- [x] Dangerous actions 有红色或 warning 样式。
+Test command: `bash scripts/dev/check.sh` reported `check-ok`; `DEEPSEEK_AGENT_WEBVIEW_INTERACTION_PROBE=1 bash scripts/dev/verify_tester_alpha.sh` reported `packaged-app-interaction-ok` and `verify-tester-alpha-ok`.
 
-## 13. 文案
+Native smoke path: packaged app at `build/tester-alpha/DeepSeek-Agent-alpha-macos/DeepSeek Agent.app`; zip-download simulation at `/tmp/deepseek-agent-user-smoke/DeepSeek-Agent-alpha-macos/DeepSeek Agent.app`; latest screenshot at `/tmp/deepseek-agent-user-smoke-window-latest.png`.
 
-- [x] 只使用 DeepSeek / DeepSeek Agent 命名。
-- [x] 不出现 OpenAI/Codex provider 文案。
-- [x] 空状态指导下一步。
-- [x] 错误状态说明原因和操作。
+Interaction probe coverage: Demo setup, New thread, prompt send, `Allow once`, `Deny`, `Stop`, `Always allow in this workspace`, and subsequent saved-rule auto-approval.
 
-## 14. Codex 输出要求
+Live runtime evidence: bundled `deepseek-tui serve` called the self-hosted DeepSeek-compatible endpoint `https://iruidong.com/v1` with model `deepseek-v4-flash`; a no-tool agent message returned `REAL_RUNTIME_SMOKE_OK`.
 
-Codex 完成后必须在回复中列出：
+Remaining known issues: ad-hoc signed and not notarized; Computer Use cannot attach because Accessibility reports zero windows while CoreGraphics shows an onscreen app window.
 
-```text
-Build command:
-Test command:
-Smoke test path:
-Remaining known issues:
-Screenshots or screen descriptions:
-```
+Screenshots or screen descriptions: First Run Setup fills the real macOS window with neutral sidebar/content surfaces, DeepSeek-only model selection, editable workspace, and Demo Mode toggle.

@@ -124,11 +124,11 @@ Fake runtime should emulate:
 6. `POST /v1/approvals/{approval_id}` -> accepted decision.
 7. `GET /v1/usage` -> usage aggregate.
 
-## Manual fake-runtime smoke test
+## Manual Demo Mode smoke test
 
 Acceptance steps:
 
-1. Launch app in fake runtime mode.
+1. Launch app and enable Demo Mode.
 2. Pick any folder.
 3. Create or select a thread.
 4. Send: `Explain this project`.
@@ -182,5 +182,5 @@ If Codex cannot run a check, it must write:
 - command attempted,
 - exact error,
 - missing prerequisite,
-- whether fake-runtime tests still pass,
+- whether Demo Mode tests still pass,
 - next step for a human.

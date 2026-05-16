@@ -1,109 +1,155 @@
-# Codex Goal: Implement Product Journey for DeepSeek Agent macOS MVP
+# Codex Goal: TUI-Aligned DeepSeek Agent macOS Client
 
 ## Goal
 
-Build a usable macOS MVP for **DeepSeek Agent**, using DeepSeek-TUI as the runtime core and DeepSeek-only product scope. The app must behave like a real product, not a static mockup.
-
-The MVP must support the complete product journey:
+Build a customer-testable macOS GUI for **DeepSeek Agent** that matches the
+DeepSeek-TUI product model as closely as a native desktop shell can:
 
 ```text
 First Run Setup
-  -> Demo Mode or DeepSeek API key setup
-  -> Project Command Center
-  -> New Thread
-  -> Send Prompt
-  -> Agent/FakeRuntime Response
-  -> Review Changes
-  -> Apply/Reject
-  -> Settings & Usage
+  -> Workspace + DeepSeek endpoint/key/model
+  -> Thread-first workbench
+  -> Prompt
+  -> Tool call cards
+  -> Approval decision
+  -> Tool result
+  -> Assistant response
 ```
 
-## Core constraints
+The GUI must not invent a separate product workflow. It is a local supervisor
+for the DeepSeek-TUI runtime, not a project manager, code review product, or git
+client.
 
-- DeepSeek-only. Do not add OpenAI, Codex, Anthropic, Gemini, or generic provider support.
-- Runtime core is DeepSeek-TUI sidecar or FakeRuntimeAdapter. Do not rewrite the agent runtime.
-- Demo Mode must work without API key.
-- No system Keychain password prompt should appear during normal usage.
-- No fake macOS traffic-light window buttons inside the content UI.
-- No large blue/purple marketing background inside the real app content area.
-- Every visible button must be wired, disabled with a reason, or hidden.
-- Do not leave static mock buttons.
-- Do not make `Commit 0 files` an enabled primary action.
+## Product Principles
 
-## Required screens
+- DeepSeek-only. Do not add OpenAI, Codex, Anthropic, Gemini, or generic
+  provider UI.
+- DeepSeek-TUI is the runtime source of truth for threads, turns, events, tools,
+  approvals, tasks, workspace boundaries, and usage.
+- The GUI surfaces the TUI concepts directly: `Plan`, `Agent`, `YOLO`, approval
+  policy, workspace boundary, sandbox/trust state, tool calls, and approvals.
+- Git diff, run tests, apply patch, shell commands, MCP calls, and commit flows
+  are model tool calls. They appear in the timeline when requested by the
+  runtime; they are not fixed product buttons.
+- The user-facing control point is permission: approve once, always allow in a
+  scoped way, deny, or stop.
+- Demo Mode may exist only as an offline simulation of the TUI flow. It must not
+  create fake review queues, fake changed files, or fake commit workflows.
+- Every visible control is wired to real state, disabled with a clear reason, or
+  hidden.
+
+## Required Screens
 
 1. First Run Setup
-2. Project Command Center
-3. Active Thread
-4. Review Changes
-5. Settings & Usage
-6. Automations skeleton
-7. Skills skeleton
-8. Runtime Diagnostics or status surface
+2. Thread Workbench
+3. Runtime Settings
+4. Runtime Diagnostics
 
-## Required journeys
+No primary `Project Command Center`, `Review Changes`, `Automations`, or
+`Skills` screens are allowed unless they become thin runtime introspection over
+real `/v1/*` data. They must not be placeholder product pages.
 
-### Journey 1: Demo setup
+## Required Journeys
 
-- Launch app without API key.
-- Enable Demo Mode.
-- Choose workspace or demo workspace.
-- Complete setup.
-- Land on Project Command Center.
+### Journey 1: Setup
 
-### Journey 2: New thread
+- Launch with no saved runtime configuration.
+- User enters DeepSeek-compatible URL, API key, model, and workspace.
+- User can choose Demo Mode for offline diagnostics without an API key.
+- User completes setup and lands on the thread workbench.
+- No system Keychain password prompt appears during normal setup.
 
-- Click New thread.
-- Enter prompt.
-- Send prompt.
-- FakeRuntime emits agent response, file changes, test evidence.
-- Active Thread updates without freezing.
+### Journey 2: Thread and Tool Flow
 
-### Journey 3: Review changes
+- User creates or selects a thread.
+- User enters a prompt and sends it.
+- Demo Mode emits a TUI-like sequence:
+  - user message,
+  - assistant planning/status,
+  - tool call card,
+  - approval required card,
+  - approval decision,
+  - tool result,
+  - assistant response.
+- The UI does not fabricate changed files or commit actions.
 
-- Open Review Changes.
-- Select a changed file.
-- See diff or structured placeholder.
-- Apply selected.
-- Reject selected.
-- Commit button enabled only when accepted files > 0 and message exists.
+### Journey 3: Approval Flow
 
-### Journey 4: Settings
+- Approval cards show tool name, action type, command when present, workspace
+  target, expected side effect, and risk.
+- Pending approvals expose:
+  - `Allow once`
+  - `Always allow in this workspace`
+  - `Deny`
+  - `Stop`
+- After a decision, pending action buttons disappear and the recorded decision
+  remains visible.
+- `Always allow in this workspace` records a scoped local rule in Demo Mode and
+  must be ready to map to DeepSeek-TUI `auto_allow` when the runtime endpoint is
+  available.
 
-- Open Settings.
-- Change model between deepseek-v4-flash and deepseek-v4-pro.
-- Toggle workspace preferences.
-- Save/delete API key through non-invasive Keychain or mockable key storage.
-- See usage and runtime status.
+### Journey 4: TUI Mode and Runtime Settings
 
-## Implementation order
+- The active thread shows `Plan`, `Agent`, or `YOLO`.
+- Settings expose:
+  - DeepSeek URL,
+  - model,
+  - API key save/delete,
+  - workspace path,
+  - TUI mode,
+  - approval policy,
+  - sandbox/trust summary,
+  - feature flags/capabilities when reported by runtime.
+- `Plan` is described as read-only investigation.
+- `Agent` is described as multi-step tool use with approvals.
+- `YOLO` is described as trusted auto-approval and must look visually dangerous.
 
-1. Inspect current project and identify tech stack.
-2. Fix App shell: no fake window chrome, no blue background bleed.
-3. Implement or stabilize FakeRuntimeAdapter.
-4. Implement routing between screens.
-5. Wire all sidebar and menu actions.
-6. Implement First Run Setup state.
-7. Implement Thread state and composer behavior.
-8. Implement Review Changes state and actions.
-9. Implement Settings state and DeepSeek-only model controls.
-10. Implement Keychain behavior or mockable abstraction without system password prompts.
-11. Add tests/smoke checks.
-12. Update PROGRESS.md with results.
+### Journey 5: Runtime Diagnostics
 
-## Acceptance checklist
+- Runtime status is always visible.
+- Diagnostics can be refreshed.
+- Real runtime unavailable states must be explicit and recoverable.
+- Demo Mode is clearly labeled as a local simulation.
 
-Use `docs/07_ACCEPTANCE_CHECKLIST.md` as the source of truth. Continue iterating until the checklist passes or a precise blocker is found.
+## Explicit Non-Goals
 
-## Output requirements
+- No client-owned Apply/Reject/Commit workflow.
+- No fake review queue.
+- No fake diff viewer standing in for runtime changes.
+- No client-owned `Open in IDE`, `Run tests`, or `View diffs` buttons unless the
+  runtime has emitted those as tool calls or exposes a real endpoint.
+- No placeholder Automations or Skills product pages.
+- No VM sandbox implementation in this milestone.
+- No notarization requirement for this alpha, but tester docs must explain the
+  Gatekeeper workaround.
 
-At the end of each iteration, report:
+## Implementation Order
+
+1. Replace old product docs/checklists with this TUI-aligned PRD.
+2. Add failing UI tests for the new product contract.
+3. Remove primary navigation and state for Project Command Center, Review
+   Changes, Automations, and Skills.
+4. Make the post-setup default screen the thread workbench.
+5. Add TUI mode and approval policy state to the UI.
+6. Replace review/commit controls with tool/approval cards and scoped
+   permission controls.
+7. Update Demo Mode to emit TUI-like tool and approval events only.
+8. Update Settings and Diagnostics to expose runtime concepts.
+9. Run automated checks and package smoke tests.
+10. Use Computer Use to validate the native app journey end-to-end.
+
+## Acceptance Checklist
+
+Use `docs/07_ACCEPTANCE_CHECKLIST.md` as the source of truth. Continue iterating
+until the checklist passes or a precise blocker is found with evidence.
+
+## Output Requirements
+
+At the end, report:
 
 - Files changed
 - Build command and result
 - Test command and result
-- Which user journeys were manually or automatically verified
-- Known remaining issues
-- Next step
-
-Do not stop after only improving visual design. The product must be clickable and testable.
+- Native app smoke path and result
+- Remaining known issues
+- Screenshots or screen descriptions

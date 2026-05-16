@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 APP_NAME="${DEEPSEEK_AGENT_APP_NAME:-DeepSeek Agent}"
 BUNDLE_ID="${DEEPSEEK_AGENT_BUNDLE_ID:-app.deepseek.agent}"
-VERSION="${DEEPSEEK_AGENT_VERSION:-0.1.0-alpha.7}"
+VERSION="${DEEPSEEK_AGENT_VERSION:-0.1.0-alpha.8}"
 BUILD_ROOT="${DEEPSEEK_AGENT_BUILD_ROOT:-$ROOT/build/tester-alpha}"
 PACKAGE_DIR="$BUILD_ROOT/DeepSeek-Agent-alpha-macos"
 APP_DIR="$PACKAGE_DIR/$APP_NAME.app"

@@ -53,7 +53,7 @@ export class FakeAgentBridge implements AgentBridge {
             kind: "user",
             title: "You",
             content:
-              "Inspect this workspace and show how setup, review, approvals, and local verification will work for a tester.",
+              "Inspect this workspace and show how threads, tools, approvals, and local verification work for a tester.",
             status: "completed",
           },
           {
@@ -61,7 +61,7 @@ export class FakeAgentBridge implements AgentBridge {
             kind: "assistant",
             title: "DeepSeek Agent",
             content:
-              "Demo Mode is connected. I can show the local setup flow, review workspace, terminal evidence, and approval handling without requiring an API key.",
+              "Demo Mode is connected. I can show the local TUI-style thread, tool call, approval, and result flow without requiring an API key.",
             status: "completed",
           },
         ],
@@ -157,7 +157,7 @@ export class FakeAgentBridge implements AgentBridge {
         this.emit(
           threadId,
           "item.started",
-          { itemId: toolItemId, kind: "tool", title: "Command preview", content: "bash scripts/dev/check.sh" },
+          { itemId: toolItemId, kind: "tool", title: "exec_shell", content: "Command: bash scripts/dev/check.sh\ncwd: current workspace\nstatus: waiting for approval" },
           turnId,
         ),
       () => this.emit(threadId, "item.completed", { itemId: toolItemId }, turnId),
@@ -169,7 +169,7 @@ export class FakeAgentBridge implements AgentBridge {
             itemId: approvalItemId,
             approvalId,
             title: "Run local verification",
-            toolName: "shell",
+            toolName: "exec_shell",
             actionType: "command",
             cwd: record.thread.projectPath,
             command: "bash scripts/dev/check.sh",
@@ -216,7 +216,17 @@ export class FakeAgentBridge implements AgentBridge {
 
     const turnId = approvalId.replace("-approval-id", "");
     const assistantItemId = `${turnId}-assistant`;
+    const toolResultItemId = `${turnId}-tool-result`;
     this.emit(record.thread.id, "approval.decided", { approvalId, decision }, turnId);
+    if (decision === "allow") {
+      this.emit(record.thread.id, "item.started", {
+        itemId: toolResultItemId,
+        kind: "tool",
+        title: "Tool result",
+        content: "exit_code: 0\nsummary: local verification completed in Demo Mode",
+      }, turnId);
+      this.emit(record.thread.id, "item.completed", { itemId: toolResultItemId }, turnId);
+    }
     this.emit(record.thread.id, "item.delta", {
       itemId: assistantItemId,
       delta: decision === "allow" ? "Approval granted. The demo check completed cleanly." : "Approval denied. I stopped before running the command.",

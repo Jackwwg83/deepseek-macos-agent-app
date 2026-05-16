@@ -33,6 +33,17 @@ enum AppWebViewFactory {
                 runInteractionProbe: environment["DEEPSEEK_AGENT_WEBVIEW_INTERACTION_PROBE"] == "1"
             )
             configuration.userContentController.add(configuredProbe, contentWorld: .page, name: "deepseekAgentProbe")
+            if environment["DEEPSEEK_AGENT_WEBVIEW_INTERACTION_PROBE"] == "1" {
+                configuration.userContentController.addUserScript(WKUserScript(
+                    source: """
+                    localStorage.removeItem("deepseek-agent.autoAllowRules");
+                    localStorage.removeItem("deepseek-agent.approvalPolicy");
+                    localStorage.removeItem("deepseek-agent.tuiMode");
+                    """,
+                    injectionTime: .atDocumentStart,
+                    forMainFrameOnly: true
+                ))
+            }
             probe = configuredProbe
         } else {
             probe = nil
@@ -44,7 +55,7 @@ enum AppWebViewFactory {
             objc_setAssociatedObject(webView, &AssociatedKeys.probe, probe, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
         bridge?.attach(to: webView)
-        webView.customUserAgent = "DeepSeekAgentApp/0.1.0-alpha.7"
+        webView.customUserAgent = "DeepSeekAgentApp/0.1.0-alpha.8"
         loadContent(in: webView, environment: environment)
         probe?.scheduleWork(in: webView)
         if let bridge {
@@ -187,7 +198,7 @@ private final class AppWebViewProbe: NSObject, WKNavigationDelegate, WKScriptMes
               error: "Probe watchdog timed out",
               bodyText: text().slice(0, 2000)
             });
-          }, 20000);
+          }, 60000);
           const clickButton = (match) => {
             const buttons = Array.from(document.querySelectorAll("button"));
             const button = buttons.find((candidate) => {
@@ -219,6 +230,27 @@ private final class AppWebViewProbe: NSObject, WKNavigationDelegate, WKScriptMes
             }
             throw new Error(`Timed out waiting for: ${needle}`);
           };
+          const setPrompt = (value) => {
+            const textarea = document.querySelector("textarea[aria-label='Prompt']");
+            if (!textarea) throw new Error("Missing prompt textarea");
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+            if (!setter) throw new Error("Missing textarea value setter");
+            setter.call(textarea, value);
+            textarea.dispatchEvent(new Event("input", { bubbles: true }));
+          };
+          const sendPrompt = async () => {
+            clickButton(/New thread/);
+            await sleep(200);
+            setPrompt(`Explain this project ${Date.now()}`);
+            await sleep(100);
+            await waitForEnabledButton("Send prompt");
+            clickButton("Send prompt");
+          };
+          const runPromptToApproval = async (decisionButton) => {
+            await sendPrompt();
+            await waitForEnabledButton(decisionButton, 10000);
+            await waitForText("Run local verification");
+          };
 
           (async () => {
             const result = {
@@ -228,7 +260,12 @@ private final class AppWebViewProbe: NSObject, WKNavigationDelegate, WKScriptMes
               sentPrompt: false,
               sawApproval: false,
               approved: false,
-              reviewedChanges: false,
+              alwaysAllowed: false,
+              autoAllowedFuture: false,
+              denied: false,
+              stopped: false,
+              sawToolResult: false,
+              noClientCommitWorkflow: false,
               bodyText: ""
             };
 
@@ -236,35 +273,48 @@ private final class AppWebViewProbe: NSObject, WKNavigationDelegate, WKScriptMes
             clickButton("Enable Demo Mode");
             await sleep(100);
             clickButton("Complete Setup");
-            await waitForText("Project Command Center");
+            await waitForText("Thread Workbench");
             result.completedSetup = true;
 
-            clickButton(/New thread/);
-            await waitForText("New chat");
-            result.freshThreadNoFiles = !text().includes("web/src/embedded/chat/App.tsx") && text().includes("No changed files yet");
-
-            clickButton("Explain this project");
-            await sleep(100);
-            clickButton("Send prompt");
+            await runPromptToApproval("Allow once");
+            result.freshThreadNoFiles = !text().includes("web/src/embedded/chat/App.tsx") && !text().includes("Commit 1 file");
             result.sentPrompt = true;
-            await sleep(2000);
-
-            await waitForText("Run local verification");
             result.sawApproval = true;
             clickButton("Allow once");
             await waitForText("Approval granted");
             result.approved = true;
+            await waitForText("Tool result");
+            result.sawToolResult = true;
+            result.noClientCommitWorkflow =
+              !text().includes("Project Command Center") &&
+              !text().includes("Review changes") &&
+              !text().includes("Apply selected") &&
+              !text().includes("Commit 1 file");
 
-            clickButton("Review changes");
-            await waitForText("web/src/embedded/chat/App.tsx");
-            clickButton("Select web/src/embedded/chat/App.tsx");
-            await waitForEnabledButton("Apply selected");
-            clickButton("Apply selected");
-            await waitForText("Accepted 1 file");
-            result.reviewedChanges = text().includes("Commit 1 file");
+            await runPromptToApproval("Deny");
+            clickButton("Deny");
+            await waitForText("Approval denied");
+            await waitForText("Denied");
+            result.denied = true;
+
+            await runPromptToApproval(/^Stop$/);
+            clickButton(/^Stop$/);
+            await waitForText("Stopped");
+            result.stopped = true;
+
+            await runPromptToApproval("Always allow in this workspace");
+            clickButton("Always allow in this workspace");
+            await waitForText("Always allow rule saved");
+            await waitForText("Tool result");
+            result.alwaysAllowed = text().includes("exec_shell: bash scripts/dev/check.sh");
+
+            await sendPrompt();
+            await waitForText("Auto-approved by saved workspace rule", 10000);
+            await waitForText("Tool result");
+            result.autoAllowedFuture = true;
 
             result.bodyText = text().slice(0, 2000);
-            result.interactionPassed = result.completedSetup && result.freshThreadNoFiles && result.sentPrompt && result.sawApproval && result.approved && result.reviewedChanges;
+            result.interactionPassed = result.completedSetup && result.freshThreadNoFiles && result.sentPrompt && result.sawApproval && result.approved && result.alwaysAllowed && result.autoAllowedFuture && result.denied && result.stopped && result.sawToolResult && result.noClientCommitWorkflow;
             clearTimeout(watchdog);
             postProbe(result);
           })().catch((error) => {
@@ -286,6 +336,28 @@ private final class AppWebViewProbe: NSObject, WKNavigationDelegate, WKScriptMes
                 return
             }
             _ = result
+            Self.pollInteractionProbeResult(in: webView, outputURL: outputURL, remainingAttempts: 80)
+        }
+    }
+
+    private static func pollInteractionProbeResult(in webView: WKWebView, outputURL: URL, remainingAttempts: Int) {
+        guard remainingAttempts > 0 else {
+            Self.write(["event": "interactionProbeFailed", "error": "Timed out waiting for browser probe result."], to: outputURL)
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak webView] in
+            guard let webView else { return }
+            webView.evaluateJavaScript("window.__deepseekAgentProbeResult || ''") { result, error in
+                if let error {
+                    Self.write(["event": "interactionProbeFailed", "error": error.localizedDescription], to: outputURL)
+                    return
+                }
+                if let json = result as? String, !json.isEmpty {
+                    Self.writeRaw(json, to: outputURL)
+                    return
+                }
+                Self.pollInteractionProbeResult(in: webView, outputURL: outputURL, remainingAttempts: remainingAttempts - 1)
+            }
         }
     }
 
@@ -305,7 +377,7 @@ private final class AppWebViewProbe: NSObject, WKNavigationDelegate, WKScriptMes
           bodyHTMLLength: document.body ? document.body.innerHTML.length : -1,
           rootHTMLLength: document.getElementById("root") ? document.getElementById("root").innerHTML.length : -1,
           containsStarterChat: document.body ? document.body.innerText.includes("New chat") : false,
-          containsV2Shell: document.body ? (document.body.innerText.includes("DeepSeek Agent") && (document.body.innerText.includes("First Run Setup") || document.body.innerText.includes("Project Command Center") || document.body.innerText.includes("Active thread"))) : false,
+          containsV2Shell: document.body ? (document.body.innerText.includes("DeepSeek Agent") && (document.body.innerText.includes("First Run Setup") || document.body.innerText.includes("Thread Workbench") || document.body.innerText.includes("Runtime Settings"))) : false,
           containsBooting: document.body ? document.body.innerText.includes("BOOTING") : false,
           containsLoadingThread: document.body ? document.body.innerText.includes("Loading thread") : false,
           bodyBackground: document.body ? getComputedStyle(document.body).backgroundColor : null,
