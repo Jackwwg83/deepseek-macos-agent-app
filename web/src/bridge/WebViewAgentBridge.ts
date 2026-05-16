@@ -19,6 +19,7 @@ import type {
 type NativeMethod =
   | "getRuntimeSettings"
   | "saveRuntimeSettings"
+  | "clearAPIKey"
   | "useDemoRuntime"
   | "health"
   | "runtimeInfo"
@@ -93,6 +94,10 @@ export class WebViewAgentBridge implements AgentBridge {
     return this.request("saveRuntimeSettings", req);
   }
 
+  clearAPIKey(): Promise<RuntimeSettingsSnapshot> {
+    return this.request("clearAPIKey", {});
+  }
+
   useDemoRuntime(): Promise<RuntimeSettingsSnapshot> {
     return this.request("useDemoRuntime", {});
   }
@@ -158,21 +163,24 @@ export class WebViewAgentBridge implements AgentBridge {
     const id = globalThis.crypto.randomUUID();
     const envelope: NativeEnvelope<unknown> = { id, method, payload };
 
-    try {
-      const reply = handler.postMessage(envelope);
-      if (reply && typeof (reply as Promise<unknown>).then === "function") {
-        return (reply as Promise<unknown>).then((value) => value as TResult);
-      }
-    } catch (error) {
-      return Promise.reject(error instanceof Error ? error : new Error("Native DeepSeek bridge request failed"));
-    }
-
     return new Promise<TResult>((resolve, reject) => {
       this.pending.set(id, {
         resolve: (value: unknown) => resolve(value as TResult),
         reject,
       });
-      handler.postMessage(envelope);
+      try {
+        const reply = handler.postMessage(envelope);
+        if (reply && typeof (reply as Promise<unknown>).then === "function") {
+          this.pending.delete(id);
+          (reply as Promise<unknown>).then(
+            (value) => resolve(value as TResult),
+            (error: unknown) => reject(error instanceof Error ? error : new Error(String(error))),
+          );
+        }
+      } catch (error) {
+        this.pending.delete(id);
+        reject(error instanceof Error ? error : new Error("Native DeepSeek bridge request failed"));
+      }
     });
   }
 }

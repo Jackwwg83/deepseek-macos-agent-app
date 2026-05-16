@@ -130,3 +130,90 @@
   - None observed in the documented closeout path.
 - Blockers:
   - Not notarized; tester alpha is ad-hoc signed only.
+
+## 2026-05-16 11:25 — GPT Pro UI Stabilization Closeout
+
+- Changed:
+  - Reworked the embedded UI to match the GPT Pro v2 stabilization pack: First Run Setup, Project Command Center, Active Thread, Review Changes, Settings & Usage, and a native-feeling light visual system.
+  - Removed fake in-content traffic lights and the old demo-path UI/data artifacts from the active app surface.
+  - Made real URL/key/model setup the default onboarding path and kept Demo Mode opt-in for offline diagnostics only.
+  - Fixed the runtime inspector so an authenticated real runtime shows API key status as `Configured` instead of `Required`.
+  - Added intentional new-chat and no-change review empty states.
+  - Added accessible names for setup inputs, model selectors, demo/settings toggles, and key controls.
+  - Fixed silent Keychain reads and avoided launch-time Keychain prompts.
+  - Changed default runtime synchronization to thread-detail polling and made direct WebView event push opt-in via `DEEPSEEK_AGENT_ENABLE_WEBVIEW_EVENT_PUSH=1` after native probe evidence showed direct push could freeze WebKit.
+  - Added `docs/IMPLEMENTATION_PROGRESS.md`, `docs/UI_QA_RESULTS.md`, and `docs/KNOWN_ISSUES.md`.
+- Verified:
+  - `npm run lint` passed.
+  - `npm run typecheck` passed.
+  - `npm test` passed.
+  - `swift test` passed.
+  - `bash scripts/dev/check.sh` passed and reported `check-ok`.
+  - `bash scripts/dev/verify_tester_alpha.sh` passed and reported `verify-tester-alpha-ok`.
+  - Real bundled-sidecar model-turn smoke passed against a user-supplied DeepSeek-compatible endpoint, key, and model.
+  - Real packaged-app WebView probe reached `Project Command Center` in `real` mode and showed API key status `Configured`.
+  - Optional Demo Mode packaged-app WebView interaction probe passed: setup, fresh thread, send prompt, approval card, Allow, and approval-granted completion.
+  - Window capture `/tmp/deepseek-agent-window.png` confirmed the v2 UI and native window chrome.
+- Failing checks:
+  - Initial Computer Use attachment failed in this session; it was recovered and replaced by a passing live Computer Use desktop validation in the 17:20 checkpoint. See `docs/UI_QA_RESULTS.md`.
+- Blockers:
+  - None for launching and testing the MVP locally.
+  - Not notarized; tester alpha remains ad-hoc signed only.
+
+## 2026-05-16 16:10 — Product PRD Journey Closeout
+
+- Changed:
+  - Added root `codex/CODEX_PRODUCT_GOAL.md`, `codex/AGENTS_PRODUCT.md`, and `docs/07_ACCEPTANCE_CHECKLIST.md` from the GPT Pro product PRD pack.
+  - Removed `deepseek-v3` from the visible model lists so only `deepseek-v4-flash` and `deepseek-v4-pro` are selectable.
+  - Added Automations and Skills skeleton pages with clear empty states and disabled coming-soon actions.
+  - Added a workspace Browse placeholder in setup.
+  - Extended Demo Mode so approval creates reviewable files, diff placeholders, terminal evidence, and Apply/Reject/Commit state.
+  - Changed approval action copy to `Allow once`, added approval metadata, and kept Stop/Deny actions wired.
+  - Extended the native packaged-app interaction probe through `Review changes`, file selection, `Apply selected`, and `Commit 1 file` enablement.
+- Verified:
+  - `npm run lint` passed.
+  - `npm run typecheck` passed.
+  - `npm test` passed with 5 files and 19 tests.
+  - `npm run build` passed.
+  - `swift test` passed with 31 XCTest cases.
+  - `bash scripts/dev/check.sh` passed and reported `check-ok`, including Xcode build, Swift tests, package build, packaged WebView render, bundled sidecar health, and tester-alpha verification.
+- Failing checks:
+  - None observed in the documented product checklist path.
+- Blockers:
+  - None for local MVP launch and tester-alpha handoff.
+  - Not notarized; tester alpha remains ad-hoc signed only.
+
+## 2026-05-16 17:20 — Desktop QA Hardening
+
+- Changed:
+  - Removed the First Run Setup nested window/card shell so setup fills the real macOS window.
+  - Replaced the perceived blue outer frame with neutral gray-white sidebar and inspector surfaces.
+  - Changed completed approval cards so `Stop task`, `Deny`, and `Allow once` disappear after a decision.
+  - Added explicit stopped-state handling for fake runtime approval interruption.
+  - Marked `docs/07_ACCEPTANCE_CHECKLIST.md` acceptance items complete after the fresh verification pass.
+- Verified:
+  - Computer Use attached to the packaged app and completed Setup -> Demo Mode -> Project Command Center -> New thread -> Send prompt -> Approval -> Review -> Apply selected -> Commit preview.
+  - Computer Use opened Automations, Skills, Settings, Rotate key, Manage account, and Diagnostics flows.
+  - `npm --prefix web test -- appInteractions.test.tsx` passed with 10 tests, including Allow, Deny, and Stop approval paths.
+- Failing checks:
+  - None observed in this checkpoint.
+- Blockers:
+  - None for local MVP launch and tester-alpha handoff.
+  - Not notarized; tester alpha remains ad-hoc signed only.
+
+## 2026-05-16 17:25 — Alpha.7 Root-Layer Recheck
+
+- Changed:
+  - Updated tester-alpha release metadata and packaged default version to `0.1.0-alpha.7`.
+  - Set the remaining legacy native sidebar container and WebView fallback HTML backgrounds to white/neutral colors.
+  - Updated the packaged WebView user agent version string.
+- Verified:
+  - `rg` found no remaining `alpha.6` references outside ignored historical/build paths.
+  - `bash scripts/dev/check.sh` passed and reported `check-ok`.
+  - The alpha.7 tester zip was generated at `build/tester-alpha/DeepSeek-Agent-alpha-macos.zip`.
+  - Window-level capture `/tmp/deepseek-agent-alpha7-window.png` showed no blue/purple WebView root shell or nested setup shell; only native macOS titlebar/window corner/shadow pixels remain outside the white content area.
+- Failing checks:
+  - A fresh Computer Use attach attempt after the alpha.7 relaunch returned `cgWindowNotFound` even though CoreGraphics showed the `DeepSeek Agent` window onscreen. The earlier 17:20 live Computer Use product journey remains the latest successful desktop interaction pass.
+- Blockers:
+  - None for local MVP launch and tester-alpha handoff.
+  - Not notarized; tester alpha remains ad-hoc signed only.

@@ -14,6 +14,10 @@ final class RuntimeBridgeController: NSObject, WKScriptMessageHandler, WKScriptM
         self.nativeActions = nativeActions
     }
 
+    deinit {
+        eventTasks.values.forEach { $0.cancel() }
+    }
+
     func attach(to webView: WKWebView) {
         self.webView = webView
     }
@@ -27,7 +31,9 @@ final class RuntimeBridgeController: NSObject, WKScriptMessageHandler, WKScriptM
         Task {
             do {
                 let envelope = try BridgeMessageDecoder.decode(data: data, decoder: decoder)
+                trace(method: envelope.method.rawValue, transport: "callback")
                 let resultData = try await route(envelope)
+                trace(method: "\(envelope.method.rawValue).completed", transport: "callback")
                 let resultJSON = String(data: resultData, encoding: .utf8) ?? "null"
                 resolve(id: envelope.id, resultJSON: resultJSON, error: nil)
             } catch {
@@ -43,18 +49,26 @@ final class RuntimeBridgeController: NSObject, WKScriptMessageHandler, WKScriptM
         replyHandler: @escaping (Any?, String?) -> Void
     ) {
         guard let data = try? JSONSerialization.data(withJSONObject: message.body, options: []) else {
-            replyHandler(nil, "Native bridge received a non-JSON message.")
+            DispatchQueue.main.async {
+                replyHandler(nil, "Native bridge received a non-JSON message.")
+            }
             return
         }
 
         Task {
             do {
                 let envelope = try BridgeMessageDecoder.decode(data: data, decoder: decoder)
+                trace(method: envelope.method.rawValue, transport: "reply")
                 let resultData = try await route(envelope)
+                trace(method: "\(envelope.method.rawValue).completed", transport: "reply")
                 let result = try JSONSerialization.jsonObject(with: resultData, options: [])
-                replyHandler(result, nil)
+                DispatchQueue.main.async {
+                    replyHandler(result, nil)
+                }
             } catch {
-                replyHandler(nil, error.localizedDescription)
+                DispatchQueue.main.async {
+                    replyHandler(nil, error.localizedDescription)
+                }
             }
         }
     }
@@ -62,12 +76,22 @@ final class RuntimeBridgeController: NSObject, WKScriptMessageHandler, WKScriptM
     private func route(_ envelope: BridgeEnvelope) async throws -> Data {
         switch envelope.method {
         case .getRuntimeSettings:
-            return try encoder.encode(try requireNativeActions().getRuntimeSettings())
+            return try await MainActor.run {
+                try encoder.encode(try requireNativeActions().getRuntimeSettings())
+            }
         case .saveRuntimeSettings:
             let payload = try requirePayload(envelope, as: SaveRuntimeSettingsPayload.self)
-            return try encoder.encode(try requireNativeActions().saveRuntimeSettings(payload))
+            return try await MainActor.run {
+                try encoder.encode(try requireNativeActions().saveRuntimeSettings(payload))
+            }
+        case .clearAPIKey:
+            return try await MainActor.run {
+                try encoder.encode(try requireNativeActions().clearAPIKey())
+            }
         case .useDemoRuntime:
-            return try encoder.encode(try requireNativeActions().useDemoRuntime())
+            return try await MainActor.run {
+                try encoder.encode(try requireNativeActions().useDemoRuntime())
+            }
         case .health:
             return try encoder.encode(try await client.health())
         case .runtimeInfo:
@@ -125,14 +149,18 @@ final class RuntimeBridgeController: NSObject, WKScriptMessageHandler, WKScriptM
     private func subscribe(threadId: String, sinceSeq: Int?) {
         eventTasks[threadId]?.cancel()
         let stream = client.subscribeEvents(threadId: threadId, sinceSeq: sinceSeq)
-        eventTasks[threadId] = Task { [weak self] in
+        eventTasks[threadId] = Task { [self] in
             do {
                 for try await event in stream {
                     try Task.checkCancellation()
-                    self?.emit(threadId: threadId, event: event)
+                    trace(method: "subscription.received.\(event.event)", transport: "loop")
+                    emit(threadId: threadId, event: event)
+                    trace(method: "subscription.emitted.\(event.event)", transport: "loop")
                 }
+                trace(method: "subscription.finished", transport: "loop")
             } catch {
-                self?.resolve(id: "subscription-\(threadId)", resultJSON: "null", error: error.localizedDescription)
+                trace(method: "subscription.failed.\(error.localizedDescription)", transport: "loop")
+                resolve(id: "subscription-\(threadId)", resultJSON: "null", error: error.localizedDescription)
             }
         }
     }
@@ -150,18 +178,72 @@ final class RuntimeBridgeController: NSObject, WKScriptMessageHandler, WKScriptM
     }
 
     private func emit(threadId: String, event: RuntimeEvent) {
-        guard let eventData = try? encoder.encode(event),
+        trace(method: event.event, transport: "emit")
+        guard ProcessInfo.processInfo.environment["DEEPSEEK_AGENT_ENABLE_WEBVIEW_EVENT_PUSH"] == "1" else {
+            trace(method: "event-push.disabled.\(event.event)", transport: "emit")
+            return
+        }
+        guard let eventData = try? JSONSerialization.data(withJSONObject: Self.jsonObject(for: event), options: []),
               let eventJSON = String(data: eventData, encoding: .utf8) else {
+            trace(method: "encode.failed.\(event.event)", transport: "emit")
             return
         }
         let script = "window.deepseekAgentBridgeEvent(\(Self.jsonString(threadId)), \(eventJSON));"
         DispatchQueue.main.async { [weak webView] in
             webView?.evaluateJavaScript(script)
         }
+        trace(method: "scheduled.\(event.event)", transport: "emit")
+    }
+
+    private func trace(method: String, transport: String) {
+        guard let path = ProcessInfo.processInfo.environment["DEEPSEEK_AGENT_BRIDGE_TRACE_PATH"], !path.isEmpty else {
+            return
+        }
+        let line = "\(Date().timeIntervalSince1970) \(transport) \(method)\n"
+        let url = URL(fileURLWithPath: path)
+        if FileManager.default.fileExists(atPath: path),
+           let handle = try? FileHandle(forWritingTo: url) {
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? line.write(to: url, atomically: true, encoding: .utf8)
+        }
     }
 
     private static func jsonString(_ value: String) -> String {
         let data = try? JSONSerialization.data(withJSONObject: value, options: [])
         return data.flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+    }
+
+    private static func jsonObject(for event: RuntimeEvent) -> [String: Any] {
+        var object: [String: Any] = [
+            "seq": event.seq,
+            "event": event.event,
+            "threadId": event.threadId,
+            "payload": jsonObject(for: event.payload),
+            "createdAt": event.createdAt
+        ]
+        if let turnId = event.turnId {
+            object["turnId"] = turnId
+        }
+        return object
+    }
+
+    private static func jsonObject(for value: JSONValue) -> Any {
+        switch value {
+        case .string(let string):
+            return string
+        case .number(let number):
+            return number
+        case .bool(let bool):
+            return bool
+        case .object(let object):
+            return object.mapValues { jsonObject(for: $0) }
+        case .array(let array):
+            return array.map { jsonObject(for: $0) }
+        case .null:
+            return NSNull()
+        }
     }
 }

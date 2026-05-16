@@ -27,15 +27,16 @@ final class ShellWindowController: NSWindowController {
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1536, height: 960),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "DeepSeek Agent"
-        window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = true
-        window.backgroundColor = .clear
+        window.titleVisibility = .visible
+        window.titlebarAppearsTransparent = false
+        window.isMovableByWindowBackground = false
+        window.isOpaque = true
+        window.backgroundColor = .white
         window.minSize = NSSize(width: 1180, height: 720)
         super.init(window: window)
         window.contentView = makeRootView()
@@ -53,7 +54,7 @@ final class ShellWindowController: NSWindowController {
 
         let root = NSView()
         root.wantsLayer = true
-        root.layer?.backgroundColor = NSColor.clear.cgColor
+        root.layer?.backgroundColor = NSColor.white.cgColor
         root.addSubview(webView)
         NSLayoutConstraint.activate([
             webView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
@@ -73,6 +74,10 @@ final class ShellWindowController: NSWindowController {
             saveRuntimeSettings: { [weak self] payload in
                 guard let self else { throw RuntimeClientError.unsupported("Window is no longer available.") }
                 return try self.saveRuntimeSettingsFromWeb(payload)
+            },
+            clearAPIKey: { [weak self] in
+                guard let self else { throw RuntimeClientError.unsupported("Window is no longer available.") }
+                return try self.clearAPIKeyFromWeb()
             },
             useDemoRuntime: { [weak self] in
                 guard let self else { throw RuntimeClientError.unsupported("Window is no longer available.") }
@@ -146,7 +151,7 @@ final class ShellWindowController: NSWindowController {
 
         let container = NSView()
         container.wantsLayer = true
-        container.layer?.backgroundColor = NSColor(calibratedRed: 0.957, green: 0.949, blue: 0.925, alpha: 1).cgColor
+        container.layer?.backgroundColor = NSColor.white.cgColor
         container.addSubview(stack)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
@@ -271,7 +276,7 @@ final class ShellWindowController: NSWindowController {
         let settings = settingsStore.load()
         let apiKey = try RuntimeSecretResolver.resolveAPIKey(
             environment: ProcessInfo.processInfo.environment,
-            keychainAPIKey: keychainStore.readAPIKey
+            keychainAPIKey: { try self.keychainStore.readAPIKey(allowsUserInteraction: false) }
         )
         return RuntimeSettingsSnapshot(
             baseURL: settings.baseURL,
@@ -294,7 +299,14 @@ final class ShellWindowController: NSWindowController {
             try keychainStore.saveAPIKey(apiKey)
         }
         settingsStore.save(settings)
-        try startRealRuntime(settings: settings)
+        if payload.startRuntime ?? true {
+            try startRealRuntime(settings: settings)
+        }
+        return try runtimeSettingsSnapshot()
+    }
+
+    private func clearAPIKeyFromWeb() throws -> RuntimeSettingsSnapshot {
+        try keychainStore.deleteAPIKey()
         return try runtimeSettingsSnapshot()
     }
 
@@ -304,7 +316,10 @@ final class ShellWindowController: NSWindowController {
     }
 
     private func startRealRuntime(settings: RuntimeSettings) throws {
-        guard let apiKey = try RuntimeSecretResolver.resolveAPIKey(environment: ProcessInfo.processInfo.environment, keychainAPIKey: keychainStore.readAPIKey),
+        guard let apiKey = try RuntimeSecretResolver.resolveAPIKey(
+            environment: ProcessInfo.processInfo.environment,
+            keychainAPIKey: { try self.keychainStore.readAPIKey(allowsUserInteraction: false) }
+        ),
               !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw RuntimeClientError.unsupported("Enter a DeepSeek API key, then click Complete Setup.")
         }

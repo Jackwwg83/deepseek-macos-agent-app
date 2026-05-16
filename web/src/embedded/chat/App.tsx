@@ -30,10 +30,11 @@ import { applyRuntimeEvent, createInitialThreadState, eventSeqForReconnect, type
 import { formatUsage } from "../../runtime/usage";
 import type { ApprovalDecision, RuntimeHealth, RuntimeInfo, RuntimeThread, TimelineItem, UsageAggregation } from "../../runtime/types";
 
-type AppView = "setup" | "project" | "thread" | "review" | "settings";
-type NativeCommand = "newThread" | "commandPalette" | "settings" | "review" | "stopTurn" | "demoRuntime";
+type AppView = "setup" | "project" | "thread" | "review" | "settings" | "automations" | "skills";
+type NativeCommand = "newThread" | "commandPalette" | "settings" | "review" | "stopTurn" | "demoRuntime" | "automations" | "skills";
+type SettingsSheet = "account" | "rotateKey" | null;
 
-const previewViews = new Set<AppView>(["setup", "project", "thread", "review", "settings"]);
+const previewViews = new Set<AppView>(["setup", "project", "thread", "review", "settings", "automations", "skills"]);
 
 function initialPreviewView(): AppView {
   const value = new URLSearchParams(window.location.search).get("view") as AppView | null;
@@ -44,12 +45,54 @@ const demoProjects = [
   { name: "Demo workspace", folders: ["src", "tests", "docs", "scripts"] },
 ];
 
-const changedFiles = [
-  { path: "src/agent/RuntimeBridge.ts", additions: 38, deletions: 4, status: "selected" },
-  { path: "src/ui/SetupFlow.tsx", additions: 64, deletions: 6, status: "selected" },
-  { path: "src/ui/ReviewPanel.tsx", additions: 41, deletions: 3, status: "review" },
-  { path: "tests/runtime-bridge.test.ts", additions: 27, deletions: 0, status: "reviewed" },
-  { path: "docs/test-plan.md", additions: 22, deletions: 0, status: "reviewed" },
+const deepSeekModels = ["deepseek-v4-flash", "deepseek-v4-pro"];
+
+type ReviewDecision = "accepted" | "rejected";
+type ReviewFile = { path: string; additions: number; deletions: number; status: string; summary: string; diff: string[] };
+
+const demoReviewFiles: ReviewFile[] = [
+  {
+    path: "web/src/embedded/chat/App.tsx",
+    additions: 48,
+    deletions: 12,
+    status: "modified",
+    summary: "Wires Demo Mode into the product review flow and disables empty actions.",
+    diff: [
+      "function completeSetup(settings: RuntimeSettings) {",
+      "- return startRuntime(settings);",
+      "+ const checked = validateEndpoint(settings.baseURL);",
+      "+ return startRuntime({ ...settings, baseURL: checked });",
+      "}",
+    ],
+  },
+  {
+    path: "web/src/bridge/FakeAgentBridge.ts",
+    additions: 36,
+    deletions: 4,
+    status: "modified",
+    summary: "Adds deterministic fake runtime events for approval, file review, and test evidence.",
+    diff: [
+      "async respondApproval(approvalId: string, decision: ApprovalDecision) {",
+      "- return this.runtime.respondApproval(approvalId, decision);",
+      "+ const event = createReviewQueueEvent(approvalId, decision);",
+      "+ this.emit(event);",
+      "+ return this.runtime.respondApproval(approvalId, decision);",
+      "}",
+    ],
+  },
+  {
+    path: "docs/07_ACCEPTANCE_CHECKLIST.md",
+    additions: 18,
+    deletions: 2,
+    status: "modified",
+    summary: "Documents the end-to-end product acceptance checks for tester handoff.",
+    diff: [
+      "## Review changes",
+      "- Static diff is acceptable",
+      "+ Empty review has no fake diff",
+      "+ Accepted files enable commit only with a message",
+    ],
+  },
 ];
 
 const recentRuns = [
@@ -60,10 +103,10 @@ const recentRuns = [
 ];
 
 const suggestedPrompts = [
-  ["Inspect this workspace", "Summarize structure, risks, and next useful commands"],
-  ["Plan a focused cleanup", "Create a small implementation plan with verification steps"],
-  ["Review pending changes", "Explain changed files and likely test coverage gaps"],
-  ["Prepare a tester handoff", "Draft concise install and smoke-test instructions"],
+  ["Explain this project", "Summarize structure, risks, and next useful commands"],
+  ["Find risky changes", "Review changed files and likely test coverage gaps"],
+  ["Write tests for this module", "Create focused unit or interaction tests"],
+  ["Plan a refactor", "Create a small implementation plan with verification steps"],
 ];
 
 const setupDefaults = {
@@ -86,6 +129,36 @@ function isDemoRuntime(info?: RuntimeInfo): boolean {
   return info?.mode !== "real";
 }
 
+export function runtimeAPIKeyStatusLabel(info: RuntimeInfo | undefined, hasAPIKey: boolean): string {
+  if (!info) {
+    return hasAPIKey ? "Configured" : "Unknown";
+  }
+  if (info.mode === "fake") {
+    return hasAPIKey ? "Configured; not required" : "Not required";
+  }
+  if (hasAPIKey) {
+    return "Configured";
+  }
+  return info.authRequired ? "Required" : "Not required";
+}
+
+function loadPreference(key: string, fallback: string): string {
+  try {
+    const value = globalThis.window?.localStorage?.getItem(key);
+    return value ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function savePreference(key: string, value: string) {
+  try {
+    globalThis.window?.localStorage?.setItem(key, value);
+  } catch {
+    // Local storage can be unavailable in tests or locked-down WebViews.
+  }
+}
+
 export function App() {
   const bridge = useMemo(() => createAgentBridge(), []);
   const initialView = useMemo(() => initialPreviewView(), []);
@@ -101,14 +174,32 @@ export function App() {
   const [view, setView] = useState<AppView>(initialView);
   const [setupComplete, setSetupComplete] = useState(initialView !== "setup");
   const [apiKeyDraft, setApiKeyDraft] = useState("");
+  const [hasAPIKey, setHasAPIKey] = useState(false);
   const [baseURL, setBaseURL] = useState(setupDefaults.url);
   const [model, setModel] = useState(setupDefaults.model);
   const [workspace, setWorkspace] = useState(setupDefaults.workspace);
-  const [demoMode, setDemoMode] = useState(true);
+  const [demoMode, setDemoMode] = useState(false);
   const [reviewMode, setReviewMode] = useState<"split" | "unified">("split");
-  const [reviewedFiles, setReviewedFiles] = useState(new Set(["tests/runtime-bridge.test.ts", "docs/test-plan.md"]));
+  const [reviewFiles, setReviewFiles] = useState<ReviewFile[]>([]);
+  const [reviewDecisions, setReviewDecisions] = useState<Record<string, ReviewDecision>>({});
+  const [commitMessage, setCommitMessage] = useState("Review generated changes");
+  const [reviewedFiles, setReviewedFiles] = useState(new Set<string>());
+  const [selectedReviewFiles, setSelectedReviewFiles] = useState(new Set<string>());
   const [actionNote, setActionNote] = useState<string>();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [settingsSheet, setSettingsSheet] = useState<SettingsSheet>(null);
+  const [diagnosticsResult, setDiagnosticsResult] = useState<string>();
+  const [temperature, setTemperature] = useState(() => loadPreference("deepseek-agent.temperature", "0.2"));
+  const [temperatureError, setTemperatureError] = useState<string>();
+  const [reasoningEffort, setReasoningEffort] = useState(() => loadPreference("deepseek-agent.reasoningEffort", "High"));
+  const [maxOutputTokens, setMaxOutputTokens] = useState(() => loadPreference("deepseek-agent.maxOutputTokens", "4096"));
+  const [appearanceMode, setAppearanceMode] = useState(() => loadPreference("deepseek-agent.appearanceMode", "Light"));
+  const [accentColor, setAccentColor] = useState(() => loadPreference("deepseek-agent.accentColor", "#3366ff"));
+  const [workspaceToggles, setWorkspaceToggles] = useState<Record<string, boolean>>({
+    "Auto-apply safe edits": loadPreference("deepseek-agent.toggle.autoApply", "false") === "true",
+    "Confirm destructive actions": loadPreference("deepseek-agent.toggle.confirmDestructive", "true") !== "false",
+    "Code suggestions": loadPreference("deepseek-agent.toggle.codeSuggestions", "true") !== "false",
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -131,6 +222,7 @@ export function App() {
         if (runtimeSettings.model) {
           setModel(runtimeSettings.model);
         }
+        setHasAPIKey(runtimeSettings.hasAPIKey);
         setHealth(nextHealth);
         setInfo(nextInfo);
         setThreads(nextThreads);
@@ -152,6 +244,12 @@ export function App() {
       cancelled = true;
     };
   }, [bridge]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--ds-accent", accentColor);
+    savePreference("deepseek-agent.accentColor", accentColor);
+    savePreference("deepseek-agent.appearanceMode", appearanceMode);
+  }, [accentColor, appearanceMode]);
 
   useEffect(() => {
     if (!selectedThreadId) {
@@ -187,30 +285,62 @@ export function App() {
     };
   }, [bridge, selectedThreadId]);
 
+  useEffect(() => {
+    if (!selectedThreadId || view !== "thread") {
+      return;
+    }
+    const threadId = selectedThreadId;
+    const hasActiveItems = threadState.items.some((item) => item.status === "running" || item.status === "waiting");
+    const intervalMs = info?.mode === "fake" || hasActiveItems ? 700 : 2500;
+    const interval = window.setInterval(() => {
+      void bridge.getThread(threadId).then((detail) => {
+        setThreadState(createInitialThreadState(detail.thread, detail.items, detail.lastSeq));
+      });
+    }, intervalMs);
+    return () => window.clearInterval(interval);
+  }, [bridge, info?.mode, selectedThreadId, threadState.items, view]);
+
   async function refreshUsage() {
     setUsage(await bridge.getUsage());
+  }
+
+  async function refreshThreadDetail(threadId: string) {
+    const detail = await bridge.getThread(threadId);
+    setThreadState(createInitialThreadState(detail.thread, detail.items, detail.lastSeq));
   }
 
   async function createThread() {
     const thread = await bridge.createThread({ title: "New chat", projectPath });
     setThreads(await bridge.listThreads({ limit: 20 }));
     setSelectedThreadId(thread.id);
+    setReviewFiles([]);
+    setReviewDecisions({});
+    setSelectedReviewFiles(new Set());
+    setReviewedFiles(new Set());
     setSetupComplete(true);
     setView("thread");
   }
 
   async function completeSetup() {
     try {
+      if (!demoMode && !apiKeyDraft.trim() && !hasAPIKey) {
+        setError("Enter a DeepSeek API key or enable Demo Mode before completing setup.");
+        return;
+      }
       if (demoMode) {
-        await bridge.useDemoRuntime();
+        const snapshot = await bridge.useDemoRuntime();
+        setHasAPIKey(snapshot.hasAPIKey);
       } else {
-        await bridge.saveRuntimeSettings({
+        const snapshot = await bridge.saveRuntimeSettings({
           baseURL,
           model,
           apiKey: apiKeyDraft.trim() || undefined,
+          startRuntime: true,
         });
+        setHasAPIKey(snapshot.hasAPIKey);
       }
       setApiKeyDraft("");
+      setError(undefined);
       setSetupComplete(true);
       setProjectPath(workspace);
       setView("project");
@@ -222,6 +352,7 @@ export function App() {
 
   function selectThread(id: string) {
     setSelectedThreadId(id);
+    setSelectedReviewFiles(new Set());
     setSetupComplete(true);
     setView("thread");
   }
@@ -240,18 +371,38 @@ export function App() {
     const sent = prompt.trim();
     setPrompt("");
     setView("thread");
-    await bridge.startTurn(threadId, { input: sent });
+    window.setTimeout(() => void refreshThreadDetail(threadId), 900);
+    window.setTimeout(() => void refreshThreadDetail(threadId), 1600);
+    try {
+      await bridge.startTurn(threadId, { input: sent });
+    } catch (turnError) {
+      setError(turnError instanceof Error ? turnError.message : "Failed to start DeepSeek turn");
+    }
   }
 
   async function interruptTurn() {
-    if (!selectedThreadId || !threadState.activeTurnId) {
+    const pendingApprovalTurnId = threadState.items
+      .find((item) => item.kind === "approval" && item.status === "waiting" && item.approval)
+      ?.approval?.approvalId.replace(/-approval-id$/, "");
+    const turnId = threadState.activeTurnId ?? pendingApprovalTurnId;
+    if (!selectedThreadId || !turnId) {
       return;
     }
-    await bridge.interruptTurn(selectedThreadId, threadState.activeTurnId);
+    await bridge.interruptTurn(selectedThreadId, turnId);
+    await refreshThreadDetail(selectedThreadId);
   }
 
   async function decideApproval(approvalId: string, decision: ApprovalDecision) {
     await bridge.respondApproval(approvalId, decision);
+    if (decision === "allow" && demoRuntime) {
+      setReviewFiles(demoReviewFiles);
+      setReviewDecisions({});
+      setReviewedFiles(new Set());
+      setSelectedReviewFiles(new Set());
+    }
+    if (selectedThreadId) {
+      await refreshThreadDetail(selectedThreadId);
+    }
     await refreshUsage();
   }
 
@@ -261,6 +412,162 @@ export function App() {
       next.add(path);
       return next;
     });
+  }
+
+  function toggleSelectedReviewFile(path: string) {
+    setSelectedReviewFiles((current) => {
+      const next = new Set(current);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+    markReviewed(path);
+  }
+
+  function applySelectedReviewFiles() {
+    if (selectedReviewFiles.size === 0) {
+      setActionNote("Select a changed file before applying.");
+      return;
+    }
+    setReviewDecisions((current) => {
+      const next = { ...current };
+      selectedReviewFiles.forEach((path) => {
+        next[path] = "accepted";
+      });
+      return next;
+    });
+    setReviewedFiles((current) => {
+      const next = new Set(current);
+      selectedReviewFiles.forEach((path) => next.add(path));
+      return next;
+    });
+    setActionNote(`Accepted ${selectedReviewFiles.size} ${selectedReviewFiles.size === 1 ? "file" : "files"}.`);
+    setSelectedReviewFiles(new Set());
+  }
+
+  function rejectSelectedReviewFiles() {
+    if (selectedReviewFiles.size === 0) {
+      setActionNote("Select a changed file before rejecting.");
+      return;
+    }
+    setReviewDecisions((current) => {
+      const next = { ...current };
+      selectedReviewFiles.forEach((path) => {
+        next[path] = "rejected";
+      });
+      return next;
+    });
+    setReviewedFiles((current) => {
+      const next = new Set(current);
+      selectedReviewFiles.forEach((path) => next.add(path));
+      return next;
+    });
+    setActionNote(`Rejected ${selectedReviewFiles.size} ${selectedReviewFiles.size === 1 ? "file" : "files"}.`);
+    setSelectedReviewFiles(new Set());
+  }
+
+  function commitAcceptedReviewFiles() {
+    const acceptedCount = Object.values(reviewDecisions).filter((decision) => decision === "accepted").length;
+    if (acceptedCount === 0 || !commitMessage.trim()) {
+      setActionNote("Accept at least one file and enter a commit message before committing.");
+      return;
+    }
+    setActionNote(`Commit preview is ready for ${acceptedCount} ${acceptedCount === 1 ? "file" : "files"}.`);
+  }
+
+  async function persistRuntimePreference(next: { baseURL?: string; model?: string; apiKey?: string; startRuntime?: boolean }) {
+    const snapshot = await bridge.saveRuntimeSettings({
+      baseURL: next.baseURL ?? baseURL,
+      model: next.model ?? model,
+      apiKey: next.apiKey,
+      startRuntime: next.startRuntime ?? false,
+    });
+    setBaseURL(snapshot.baseURL || next.baseURL || baseURL);
+    setModel(snapshot.model || next.model || model);
+    setHasAPIKey(snapshot.hasAPIKey);
+    return snapshot;
+  }
+
+  async function updateModelPreference(nextModel: string) {
+    setModel(nextModel);
+    try {
+      await persistRuntimePreference({ model: nextModel, startRuntime: false });
+      setActionNote(`Model preference saved: ${nextModel}`);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save model preference");
+    }
+  }
+
+  function updateTemperature(value: string) {
+    setTemperature(value);
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0 || numeric > 2) {
+      setTemperatureError("Temperature must be between 0 and 2.");
+      return;
+    }
+    setTemperatureError(undefined);
+    savePreference("deepseek-agent.temperature", value);
+  }
+
+  function updateReasoningEffort(value: string) {
+    setReasoningEffort(value);
+    savePreference("deepseek-agent.reasoningEffort", value);
+  }
+
+  function updateMaxOutputTokens(value: string) {
+    setMaxOutputTokens(value);
+    savePreference("deepseek-agent.maxOutputTokens", value);
+  }
+
+  function toggleWorkspacePreference(label: string) {
+    setWorkspaceToggles((current) => {
+      const next = { ...current, [label]: !current[label] };
+      const storageKeys: Record<string, string> = {
+        "Auto-apply safe edits": "deepseek-agent.toggle.autoApply",
+        "Confirm destructive actions": "deepseek-agent.toggle.confirmDestructive",
+        "Code suggestions": "deepseek-agent.toggle.codeSuggestions",
+      };
+      savePreference(storageKeys[label], String(next[label]));
+      return next;
+    });
+  }
+
+  async function runDiagnostics() {
+    try {
+      const [nextHealth, nextInfo] = await Promise.all([bridge.health(), bridge.runtimeInfo()]);
+      setHealth(nextHealth);
+      setInfo(nextInfo);
+      setDiagnosticsResult(`Diagnostics: ${nextHealth.status}; mode ${nextInfo.mode}; runtime ${nextInfo.runtimeVersion}.`);
+      setActionNote("Diagnostics completed.");
+    } catch (diagnosticsError) {
+      setDiagnosticsResult(`Diagnostics failed: ${diagnosticsError instanceof Error ? diagnosticsError.message : "unknown error"}`);
+    }
+  }
+
+  async function saveRotatedKey() {
+    try {
+      const snapshot = await persistRuntimePreference({ apiKey: apiKeyDraft.trim(), startRuntime: false });
+      setHasAPIKey(snapshot.hasAPIKey);
+      setApiKeyDraft("");
+      setSettingsSheet(null);
+      setActionNote("API key saved to native Keychain storage.");
+    } catch (keyError) {
+      setError(keyError instanceof Error ? keyError.message : "Failed to rotate API key");
+    }
+  }
+
+  async function deleteAPIKey() {
+    try {
+      const snapshot = await bridge.clearAPIKey();
+      setHasAPIKey(snapshot.hasAPIKey);
+      setApiKeyDraft("");
+      setActionNote("API key deleted. Real runtime now requires a new key.");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete API key");
+    }
   }
 
   function runAppCommand(command: NativeCommand) {
@@ -289,7 +596,8 @@ export function App() {
         break;
       case "demoRuntime":
         void bridge.useDemoRuntime()
-          .then(() => {
+          .then((snapshot) => {
+            setHasAPIKey(snapshot.hasAPIKey);
             setSetupComplete(true);
             setView("project");
             setActionNote("Demo Mode is ready without an API key.");
@@ -297,6 +605,14 @@ export function App() {
           .catch((demoError: unknown) => {
             setError(demoError instanceof Error ? demoError.message : "Failed to switch to Demo Mode");
           });
+        break;
+      case "automations":
+        setSetupComplete(true);
+        setView("automations");
+        break;
+      case "skills":
+        setSetupComplete(true);
+        setView("skills");
         break;
     }
   }
@@ -343,9 +659,12 @@ export function App() {
   const workspaceName = demoRuntime ? "Demo workspace" : workspaceNameFromPath(projectPath);
   const projectTree = demoRuntime ? demoProjects : [{ name: workspaceName, folders: [] }];
   const activeThreadTitle = threadState.thread?.title ?? (demoRuntime ? "Explore DeepSeek Agent" : "New thread");
+  const hasReviewChanges = reviewFiles.length > 0;
+  const acceptedCount = Object.values(reviewDecisions).filter((decision) => decision === "accepted").length;
+  const rejectedCount = Object.values(reviewDecisions).filter((decision) => decision === "rejected").length;
 
   return (
-    <div className="deepseek-wallpaper">
+    <div className="deepseek-wallpaper" data-appearance={appearanceMode.toLowerCase()}>
       <main className={view === "setup" && !setupComplete ? "deepseek-window setup-window" : "deepseek-window app-shell"} data-view={view}>
         {view === "setup" && !setupComplete ? (
           <SetupScreen
@@ -353,14 +672,24 @@ export function App() {
             baseURL={baseURL}
             demoMode={demoMode}
             error={error}
+            hasAPIKey={hasAPIKey}
             health={health}
             model={model}
             workspace={workspace}
             onAPIKeyChange={setApiKeyDraft}
             onBaseURLChange={setBaseURL}
-            onDemoModeChange={setDemoMode}
+            onDemoModeChange={(nextDemoMode) => {
+              setDemoMode(nextDemoMode);
+              if (nextDemoMode) {
+                setError(undefined);
+              }
+            }}
             onModelChange={setModel}
             onWorkspaceChange={setWorkspace}
+            onBrowseWorkspace={() => {
+              setWorkspace("~/DeepSeekAgent");
+              setActionNote("Demo workspace selected. Native folder picker will replace this placeholder after signing.");
+            }}
             onComplete={() => void completeSetup()}
           />
         ) : (
@@ -372,10 +701,13 @@ export function App() {
               currentView={view}
               projects={projectTree}
               onCreateThread={() => void createThread()}
+              onAction={setActionNote}
               onSelectThread={selectThread}
               onShowProject={() => setView("project")}
               onShowSettings={() => setView("settings")}
               onShowReview={() => setView("review")}
+              onShowAutomations={() => setView("automations")}
+              onShowSkills={() => setView("skills")}
             />
             <section className="main-surface">
               {error ? <div className="error-banner">{error}</div> : null}
@@ -389,13 +721,15 @@ export function App() {
                 </div>
               ) : null}
               {view === "project" ? (
-                <ProjectCommandCenter isDemo={demoRuntime} model={model} projectName={workspaceName} onCreateThread={() => void createThread()} onShowReview={() => setView("review")} />
+                <ProjectCommandCenter isDemo={demoRuntime} model={model} projectName={workspaceName} onAction={setActionNote} onCreateThread={() => void createThread()} onShowReview={() => setView("review")} />
               ) : null}
               {view === "thread" ? (
                 <ActiveThread
                   activeTurnId={threadState.activeTurnId}
-                  isDemo={demoRuntime}
+                  files={reviewFiles}
+                  hasReviewChanges={hasReviewChanges}
                   model={model}
+                  onModelChange={(nextModel) => void updateModelPreference(nextModel)}
                   prompt={prompt}
                   runtimeModeLabel={runtimeModeLabel}
                   threadTitle={activeThreadTitle}
@@ -409,40 +743,95 @@ export function App() {
               ) : null}
               {view === "review" ? (
                 <ReviewChanges
-                  isDemo={demoRuntime}
+                  hasChanges={hasReviewChanges}
                   mode={reviewMode}
+                  selectedFiles={selectedReviewFiles}
+                  files={reviewFiles}
+                  reviewDecisions={reviewDecisions}
+                  acceptedCount={acceptedCount}
+                  rejectedCount={rejectedCount}
+                  commitMessage={commitMessage}
                   reviewedFiles={reviewedFiles}
                   threadTitle={activeThreadTitle}
                   onModeChange={setReviewMode}
-                  onMarkReviewed={markReviewed}
+                  onToggleFile={toggleSelectedReviewFile}
+                  onApplySelected={applySelectedReviewFiles}
+                  onRejectSelected={rejectSelectedReviewFiles}
+                  onCommit={commitAcceptedReviewFiles}
+                  onCommitMessageChange={setCommitMessage}
                   onAction={setActionNote}
+                  runtimeAvailable={health?.status === "ok"}
                 />
+              ) : null}
+              {view === "automations" ? (
+                <AutomationsPage onAction={setActionNote} />
+              ) : null}
+              {view === "skills" ? (
+                <SkillsPage onAction={setActionNote} />
               ) : null}
               {view === "settings" ? (
                 <SettingsUsage
                   apiKeyDraft={apiKeyDraft}
+                  appearanceMode={appearanceMode}
                   baseURL={baseURL}
+                  diagnosticsResult={diagnosticsResult}
+                  hasAPIKey={hasAPIKey}
                   health={health}
                   info={info}
+                  maxOutputTokens={maxOutputTokens}
                   model={model}
+                  reasoningEffort={reasoningEffort}
+                  temperature={temperature}
+                  temperatureError={temperatureError}
+                  toggles={workspaceToggles}
                   usage={usage}
+                  accentColor={accentColor}
                   onAPIKeyChange={setApiKeyDraft}
+                  onAppearanceModeChange={(value) => {
+                    setAppearanceMode(value);
+                    savePreference("deepseek-agent.appearanceMode", value);
+                    setActionNote(`Appearance set to ${value}.`);
+                  }}
+                  onAccentColorChange={setAccentColor}
+                  onDeleteKey={() => void deleteAPIKey()}
+                  onRunDiagnostics={() => void runDiagnostics()}
+                  onBaseURLChange={setBaseURL}
+                  onPersistEndpoint={(nextBaseURL) => void persistRuntimePreference({ baseURL: nextBaseURL, startRuntime: false }).then(() => setActionNote("Endpoint preference saved."))}
                   onModelChange={setModel}
-                  onAction={setActionNote}
+                  onPersistModel={(nextModel) => void updateModelPreference(nextModel)}
+                  onMaxOutputTokensChange={updateMaxOutputTokens}
+                  onReasoningEffortChange={updateReasoningEffort}
+                  onManageAccount={() => setSettingsSheet("account")}
+                  onRotateKey={() => setSettingsSheet("rotateKey")}
+                  onTemperatureChange={updateTemperature}
+                  onTogglePreference={toggleWorkspacePreference}
                 />
               ) : null}
             </section>
             <RightInspector
               view={view}
               isDemo={demoRuntime}
+              hasAPIKey={hasAPIKey}
               health={health}
               info={info}
               usage={usage}
               model={model}
               reviewedFiles={reviewedFiles}
+              reviewDecisions={reviewDecisions}
+              acceptedCount={acceptedCount}
+              rejectedCount={rejectedCount}
+              commitMessage={commitMessage}
+              selectedFiles={selectedReviewFiles}
+              files={reviewFiles}
+              hasReviewChanges={hasReviewChanges}
+              runtimeAvailable={health?.status === "ok"}
               onShowReview={() => setView("review")}
               onCreateThread={() => void createThread()}
               onAction={setActionNote}
+              onApplySelected={applySelectedReviewFiles}
+              onRejectSelected={rejectSelectedReviewFiles}
+              onCommit={commitAcceptedReviewFiles}
+              onCommitMessageChange={setCommitMessage}
             />
           </>
         )}
@@ -454,6 +843,17 @@ export function App() {
             setCommandPaletteOpen(false);
             runAppCommand(command);
           }}
+        />
+      ) : null}
+      {settingsSheet ? (
+        <SettingsModal
+          apiKeyDraft={apiKeyDraft}
+          hasAPIKey={hasAPIKey}
+          sheet={settingsSheet}
+          onAPIKeyChange={setApiKeyDraft}
+          onClose={() => setSettingsSheet(null)}
+          onDeleteKey={() => void deleteAPIKey()}
+          onSaveKey={() => void saveRotatedKey()}
         />
       ) : null}
     </div>
@@ -503,6 +903,7 @@ interface SetupScreenProps {
   baseURL: string;
   demoMode: boolean;
   error?: string;
+  hasAPIKey: boolean;
   health?: RuntimeHealth;
   model: string;
   workspace: string;
@@ -511,6 +912,7 @@ interface SetupScreenProps {
   onDemoModeChange(value: boolean): void;
   onModelChange(value: string): void;
   onWorkspaceChange(value: string): void;
+  onBrowseWorkspace(): void;
   onComplete(): void;
 }
 
@@ -519,6 +921,7 @@ function SetupScreen({
   baseURL,
   demoMode,
   error,
+  hasAPIKey,
   health,
   model,
   workspace,
@@ -527,12 +930,14 @@ function SetupScreen({
   onDemoModeChange,
   onModelChange,
   onWorkspaceChange,
+  onBrowseWorkspace,
   onComplete,
 }: SetupScreenProps) {
+  const canCompleteSetup = demoMode || apiKeyDraft.trim().length > 0 || hasAPIKey;
+
   return (
     <div className="setup-layout">
       <div className="setup-rail">
-        <TrafficLights />
         <div className="setup-logo">
           <Bot size={40} aria-hidden="true" />
         </div>
@@ -549,7 +954,7 @@ function SetupScreen({
       <section className="setup-card">
         <div className="setup-topbar">
           <BrandTitle />
-          <button className="text-button" type="button">
+          <button className="text-button" type="button" disabled title="Help opens after onboarding docs are bundled.">
             Need help?
           </button>
         </div>
@@ -559,38 +964,41 @@ function SetupScreen({
         </div>
         {error ? <div className="error-banner">{error}</div> : null}
         <SetupRow index="1" icon={<Link2 size={21} />} title="Connect to DeepSeek" description="Use a DeepSeek-compatible endpoint. HTTPS is recommended; private HTTP endpoints are allowed by the native runtime.">
-          <input className="field-input" value={baseURL} onChange={(event) => onBaseURLChange(event.target.value)} />
+          <input aria-label="DeepSeek URL" className="field-input" value={baseURL} onChange={(event) => onBaseURLChange(event.target.value)} />
         </SetupRow>
         <SetupRow index="2" icon={<KeyRound size={21} />} title="Enter your DeepSeek API key" description="The key is never written to WebView localStorage. Native builds store it in macOS Keychain.">
           <input
             className="field-input"
             type="password"
+            aria-label="DeepSeek API key"
             value={apiKeyDraft}
             placeholder={demoMode ? "Not required for Demo Mode" : "Paste API key"}
             onChange={(event) => onAPIKeyChange(event.target.value)}
           />
         </SetupRow>
         <SetupRow index="3" icon={<Layers3 size={21} />} title="Choose a model" description="DeepSeek-only model defaults for new agent threads.">
-          <select className="field-input" value={model} onChange={(event) => onModelChange(event.target.value)}>
-            <option value="deepseek-v4-flash">deepseek-v4-flash</option>
-            <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+          <select aria-label="Setup model" className="field-input" value={model} onChange={(event) => onModelChange(event.target.value)}>
+            {deepSeekModels.map((modelName) => <option key={modelName} value={modelName}>{modelName}</option>)}
           </select>
         </SetupRow>
         <SetupRow index="4" icon={<Folder size={21} />} title="Choose workspace folder" description="This is where your projects and agent data will live.">
-          <input className="field-input" value={workspace} onChange={(event) => onWorkspaceChange(event.target.value)} />
+          <div className="workspace-picker-row">
+            <input aria-label="Workspace folder" className="field-input" value={workspace} onChange={(event) => onWorkspaceChange(event.target.value)} />
+            <button className="secondary-button" type="button" onClick={onBrowseWorkspace}>Browse</button>
+          </div>
         </SetupRow>
         <SetupRow index="5" icon={<Sparkles size={21} />} title="Enable Demo Mode" description="Explore the app with a local demo runtime and no API key.">
-          <button className={demoMode ? "toggle on" : "toggle"} type="button" onClick={() => onDemoModeChange(!demoMode)} aria-pressed={demoMode}>
+          <button className={demoMode ? "toggle on" : "toggle"} type="button" onClick={() => onDemoModeChange(!demoMode)} aria-label="Enable Demo Mode" aria-pressed={demoMode}>
             <span />
           </button>
         </SetupRow>
         <div className="setup-status-card">
           <StatusMini label="Sidecar ready" value={health?.status === "ok" ? "Runtime bridge is responding." : "Waiting for runtime health."} />
-          <StatusMini label="Key storage" value={apiKeyDraft || demoMode ? "Ready for secure native storage." : "API key needed for real mode."} />
+          <StatusMini label="Key storage" value={apiKeyDraft || hasAPIKey ? "Ready for secure native storage." : demoMode ? "Not required for Demo Mode." : "API key needed for real mode."} />
           <StatusMini label="Runtime compatible" value="DeepSeek-TUI Runtime API mapped." />
         </div>
         <div className="setup-actions">
-          <button className="primary-button" type="button" onClick={onComplete}>
+          <button className="primary-button" type="button" onClick={onComplete} disabled={!canCompleteSetup} title={canCompleteSetup ? "Complete setup" : "Enter an API key or enable Demo Mode."}>
             Complete Setup
             <Send size={16} aria-hidden="true" />
           </button>
@@ -604,8 +1012,11 @@ function LeftNavigation({
   activeProjectName,
   currentView,
   onCreateThread,
+  onAction,
   onSelectThread,
   onShowProject,
+  onShowAutomations,
+  onShowSkills,
   onShowReview,
   onShowSettings,
   projects,
@@ -615,8 +1026,11 @@ function LeftNavigation({
   activeProjectName: string;
   currentView: AppView;
   onCreateThread(): void;
+  onAction(message: string): void;
   onSelectThread(id: string): void;
   onShowProject(): void;
+  onShowAutomations(): void;
+  onShowSkills(): void;
   onShowReview(): void;
   onShowSettings(): void;
   projects: Array<{ name: string; folders: string[] }>;
@@ -626,7 +1040,6 @@ function LeftNavigation({
   return (
     <aside className="left-nav">
       <div className="window-chrome">
-        <TrafficLights />
         <BrandTitle />
       </div>
       <button className="new-thread-button" type="button" onClick={onCreateThread}>
@@ -635,8 +1048,8 @@ function LeftNavigation({
         <kbd>⌘ N</kbd>
       </button>
       <nav className="primary-nav" aria-label="Primary navigation">
-        <NavButton icon={<Sparkles size={17} />} label="Automations" />
-        <NavButton icon={<Layers3 size={17} />} label="Skills" />
+        <NavButton active={currentView === "automations"} icon={<Sparkles size={17} />} label="Automations" onClick={onShowAutomations} />
+        <NavButton active={currentView === "skills"} icon={<Layers3 size={17} />} label="Skills" onClick={onShowSkills} />
         <NavButton active={currentView === "review"} icon={<FileCode2 size={17} />} label="Review changes" onClick={onShowReview} />
       </nav>
       <div className="sidebar-section">
@@ -657,7 +1070,7 @@ function LeftNavigation({
       <div className="sidebar-section projects-section">
         <div className="section-heading">
           <p className="sidebar-label">Projects</p>
-          <button type="button" aria-label="Add project">
+          <button type="button" aria-label="Add project" disabled title="Project picker is coming in the next alpha.">
             <Plus size={15} aria-hidden="true" />
           </button>
         </div>
@@ -669,7 +1082,7 @@ function LeftNavigation({
                 {project.name}
               </button>
               {project.folders.map((folder) => (
-                <button key={folder} className="folder-button" type="button">
+                <button key={folder} className="folder-button" type="button" onClick={() => onAction(`${folder} folder selected. Runtime file browser wiring is coming next.`)}>
                   <Folder size={14} aria-hidden="true" />
                   {folder}
                 </button>
@@ -695,12 +1108,14 @@ function LeftNavigation({
 function ProjectCommandCenter({
   isDemo,
   model,
+  onAction,
   onCreateThread,
   onShowReview,
   projectName,
 }: {
   isDemo: boolean;
   model: string;
+  onAction(message: string): void;
   onCreateThread(): void;
   onShowReview(): void;
   projectName: string;
@@ -708,11 +1123,11 @@ function ProjectCommandCenter({
   return (
     <div className="page project-page">
       <PageHeader eyebrow="Project" title="Project Command Center" subtitle={projectName}>
-        <button className="secondary-button" type="button">
+        <button className="secondary-button" type="button" onClick={() => onAction("Open in IDE is queued for native workspace wiring.")}>
           <Code2 size={16} aria-hidden="true" />
           Open in IDE
         </button>
-        <button className="icon-only" type="button" aria-label="More project actions">
+        <button className="icon-only" type="button" aria-label="More project actions" onClick={() => onAction("Project action menu is not expanded in this alpha.")}>
           <MoreHorizontal size={18} aria-hidden="true" />
         </button>
       </PageHeader>
@@ -732,11 +1147,11 @@ function ProjectCommandCenter({
       <div className="dashboard-grid">
         <Card title="Active tasks">
           <TaskList isDemo={isDemo} />
-          {isDemo ? <CardLink label="View all tasks" /> : null}
+          {isDemo ? <CardLink label="View all tasks" onClick={() => onAction("Task history is visible in Demo Mode.")} /> : null}
         </Card>
         <Card title="Suggested prompts">
           <PromptList onCreateThread={onCreateThread} />
-          <CardLink label="See more prompts" />
+          <CardLink label="See more prompts" onClick={() => onAction("Prompt catalog is limited to four starter prompts in this alpha.")} />
         </Card>
         <Card title="Recent agent runs">
           {isDemo ? (
@@ -753,7 +1168,7 @@ function ProjectCommandCenter({
                   ))}
                 </tbody>
               </table>
-              <CardLink label="View all runs" />
+              <CardLink label="View all runs" onClick={() => onAction("Run history is shown as demo data in this alpha.")} />
             </>
           ) : (
             <p className="empty-state">No agent runs yet.</p>
@@ -775,8 +1190,10 @@ function ProjectCommandCenter({
 
 function ActiveThread({
   activeTurnId,
-  isDemo,
+  files,
+  hasReviewChanges,
   model,
+  onModelChange,
   onApprovalDecision,
   onInterrupt,
   onPromptChange,
@@ -788,8 +1205,10 @@ function ActiveThread({
   timelineItems,
 }: {
   activeTurnId?: string;
-  isDemo: boolean;
+  files: ReviewFile[];
+  hasReviewChanges: boolean;
   model: string;
+  onModelChange(value: string): void;
   onApprovalDecision(approvalId: string, decision: ApprovalDecision): void;
   onInterrupt(): void;
   onPromptChange(value: string): void;
@@ -800,98 +1219,133 @@ function ActiveThread({
   threadTitle: string;
   timelineItems: TimelineItem[];
 }) {
-  const items = timelineItems.length > 0 ? timelineItems : (isDemo ? fallbackTimeline : []);
+  const items = timelineItems;
   return (
     <div className="page thread-page">
       <PageHeader eyebrow="Active thread" title={threadTitle}>
         <span className="runtime-badge">{runtimeModeLabel}</span>
-        <button className="icon-only" type="button" aria-label="More thread actions">
+        <button className="icon-only" type="button" aria-label="More thread actions" onClick={onShowReview}>
           <MoreHorizontal size={18} aria-hidden="true" />
         </button>
       </PageHeader>
       <div className="timeline-v2">
         {items.length > 0 ? (
           items.map((item) => (
-            <TimelineCard key={item.id} item={item} onApprovalDecision={onApprovalDecision} />
+            <TimelineCard key={item.id} item={item} onApprovalDecision={onApprovalDecision} onStopTask={onInterrupt} />
           ))
         ) : (
-          <Card className="timeline-card-v2">
-            <p className="empty-state">No messages yet. Ask DeepSeek to inspect, explain, or plan against this workspace.</p>
-          </Card>
+          <StarterCanvas onChoosePrompt={onPromptChange} />
         )}
-        {isDemo ? <FilesChangedCard onOpenReview={onShowReview} /> : null}
-        {isDemo ? <TerminalEvidenceCard /> : null}
+        {hasReviewChanges ? <FilesChangedCard files={files} onOpenReview={onShowReview} /> : null}
+        {hasReviewChanges ? <TerminalEvidenceCard /> : null}
       </div>
-      <ComposerV2 activeTurnId={activeTurnId} model={model} prompt={prompt} onChange={onPromptChange} onInterrupt={onInterrupt} onSend={onSend} />
+      <ComposerV2 activeTurnId={activeTurnId} model={model} prompt={prompt} onChange={onPromptChange} onInterrupt={onInterrupt} onModelChange={onModelChange} onSend={onSend} />
     </div>
   );
 }
 
 function ReviewChanges({
-  isDemo,
+  acceptedCount,
+  commitMessage,
+  files,
+  hasChanges,
   mode,
   onAction,
-  onMarkReviewed,
+  onApplySelected,
+  onCommit,
+  onCommitMessageChange,
   onModeChange,
+  onRejectSelected,
+  onToggleFile,
+  rejectedCount,
+  reviewDecisions,
   reviewedFiles,
+  runtimeAvailable,
+  selectedFiles,
   threadTitle,
 }: {
-  isDemo: boolean;
+  acceptedCount: number;
+  commitMessage: string;
+  files: ReviewFile[];
+  hasChanges: boolean;
   mode: "split" | "unified";
   onAction(message: string): void;
-  onMarkReviewed(path: string): void;
+  onApplySelected(): void;
+  onCommit(): void;
+  onCommitMessageChange(value: string): void;
   onModeChange(mode: "split" | "unified"): void;
+  onRejectSelected(): void;
+  onToggleFile(path: string): void;
+  rejectedCount: number;
+  reviewDecisions: Record<string, ReviewDecision>;
   reviewedFiles: Set<string>;
+  runtimeAvailable: boolean;
+  selectedFiles: Set<string>;
   threadTitle: string;
 }) {
+  const selectedCount = selectedFiles.size;
+  const additions = files.reduce((total, file) => total + file.additions, 0);
+  const deletions = files.reduce((total, file) => total + file.deletions, 0);
+  const selectedPrimaryPath = Array.from(selectedFiles)[0];
+  const selectedFile = files.find((file) => file.path === selectedPrimaryPath) ?? files[0];
+  const primaryFile = selectedFile?.path ?? "Selected change";
   return (
     <div className="page review-page">
       <PageHeader eyebrow="Active thread" title={threadTitle}>
         <span className="runtime-badge review">review</span>
-        <button className="icon-only" type="button" aria-label="More review actions">
+        <button className="icon-only" type="button" aria-label="More review actions" onClick={() => onAction("Review action menu is not expanded in this alpha.")}>
           <MoreHorizontal size={18} aria-hidden="true" />
         </button>
       </PageHeader>
       <Card className="diff-card">
         <div className="diff-header">
           <div>
-            <h3>{isDemo ? "src/ui/SetupFlow.tsx" : "No file selected"}</h3>
-            <p>{isDemo ? <><span className="positive">+64 additions</span> <span className="negative">-6 deletions</span> 5 files changed</> : "Start an agent turn to populate the review queue."}</p>
+            <h3>{hasChanges ? primaryFile : "No changes yet"}</h3>
+            <p>{hasChanges ? <><span className="positive">+{additions} additions</span> <span className="negative">-{deletions} deletions</span> {files.length} files changed</> : "Start an agent turn to populate the review queue."}</p>
           </div>
           <div className="segmented">
-            <button className={mode === "split" ? "active" : ""} type="button" onClick={() => onModeChange("split")}>Split</button>
-            <button className={mode === "unified" ? "active" : ""} type="button" onClick={() => onModeChange("unified")}>Unified</button>
+            <button className={mode === "split" ? "active" : ""} type="button" disabled={!hasChanges} title={hasChanges ? "Split diff" : "No diff available."} onClick={() => onModeChange("split")}>Split</button>
+            <button className={mode === "unified" ? "active" : ""} type="button" disabled={!hasChanges} title={hasChanges ? "Unified diff" : "No diff available."} onClick={() => onModeChange("unified")}>Unified</button>
           </div>
         </div>
         <div className="diff-body" data-mode={mode}>
-          {isDemo ? (
-            <>
-              <div className="code-line muted"><span>42</span><span>function completeSetup(settings: RuntimeSettings) &#123;</span></div>
-              <div className="code-line delete"><span>43</span><span>- return startRuntime(settings);</span></div>
-              <div className="code-line add"><span>43</span><span>+ const checked = validateEndpoint(settings.baseURL);</span></div>
-              <div className="code-line add"><span>44</span><span>+ return startRuntime(&#123; ...settings, baseURL: checked &#125;);</span></div>
-              <div className="code-line muted"><span>45</span><span>&#125;</span></div>
-            </>
+          {hasChanges && selectedFile ? (
+            selectedFile.diff.map((line, index) => (
+              <div key={`${selectedFile.path}-${index}`} className={`code-line ${line.startsWith("+") ? "add" : line.startsWith("-") ? "delete" : "muted"}`}>
+                <span>{42 + index}</span>
+                <span>{line}</span>
+              </div>
+            ))
           ) : (
-            <p className="empty-state">No generated diff is available yet.</p>
+            <div className="review-empty-state">
+              <FileCode2 size={22} aria-hidden="true" />
+              <strong>No changes yet</strong>
+              <p className="empty-state">Start an agent turn, then return here to review generated files, terminal evidence, and apply or reject actions.</p>
+            </div>
           )}
         </div>
         <div className="diff-related">
-          {isDemo ? <FilesChangedTable reviewedFiles={reviewedFiles} onMarkReviewed={onMarkReviewed} /> : <p className="empty-state">No changed files yet.</p>}
+          {hasChanges ? <FilesChangedTable files={files} reviewDecisions={reviewDecisions} reviewedFiles={reviewedFiles} selectedFiles={selectedFiles} onToggleFile={onToggleFile} /> : <p className="empty-state">No changed files yet.</p>}
           <Card className="impact-card">
             <dl>
-              <div><dt>Change type</dt><dd>{isDemo ? "Runtime setup" : "None"}</dd></div>
-              <div><dt>Risk level</dt><dd><span className="pill low">{isDemo ? "Low" : "None"}</span></dd></div>
-              <div><dt>Estimated impact</dt><dd>{isDemo ? "Local setup only" : "Waiting for changes"}</dd></div>
+              <div><dt>Change type</dt><dd>{hasChanges ? "Runtime setup" : "None"}</dd></div>
+              <div><dt>Risk level</dt><dd><span className="pill low">{hasChanges ? "Low" : "None"}</span></dd></div>
+              <div><dt>Estimated impact</dt><dd>{hasChanges ? "Local setup only" : "Waiting for changes"}</dd></div>
             </dl>
-            <p>{isDemo ? "Demo review data shows how approvals, diffs, and verification evidence will appear." : "Start a DeepSeek turn to review generated changes."}</p>
+            <p>{hasChanges ? selectedFile?.summary : "Start a DeepSeek turn to review generated changes."}</p>
           </Card>
         </div>
       </Card>
+      {hasChanges ? (
+        <div className="review-status-strip">
+          <span>Accepted {acceptedCount} {acceptedCount === 1 ? "file" : "files"}</span>
+          <span>Rejected {rejectedCount} {rejectedCount === 1 ? "file" : "files"}</span>
+        </div>
+      ) : null}
       <div className="review-bottom-grid">
-        {isDemo ? <TerminalEvidenceCard compact /> : <Card><p className="empty-state">No terminal evidence yet.</p></Card>}
+        {hasChanges ? <TerminalEvidenceCard compact /> : <Card><p className="empty-state">No terminal evidence yet.</p></Card>}
         <Card title="DeepSeek Agent">
-          <p>{isDemo ? "The selected setup change validates the endpoint before starting the runtime and keeps the API key in native storage." : "No review summary is available until DeepSeek produces changes."}</p>
+          <p>{hasChanges ? "The selected setup change validates the endpoint before starting the runtime and keeps the API key in native storage." : "No review summary is available until DeepSeek produces changes."}</p>
           <ul className="check-list">
             <li>Consistent with local runtime flow</li>
             <li>No workspace files changed in Demo Mode</li>
@@ -899,32 +1353,87 @@ function ReviewChanges({
           </ul>
         </Card>
       </div>
-      <ComposerV2 model="deepseek-v4-flash" prompt="" onChange={() => {}} onInterrupt={() => {}} onSend={() => onAction("Requested more tests for the selected change.")} placeholder="Ask DeepSeek about this change..." />
+      <ReviewActionBar
+        hasChanges={hasChanges}
+        acceptedCount={acceptedCount}
+        commitMessage={commitMessage}
+        runtimeAvailable={runtimeAvailable}
+        selectedCount={selectedCount}
+        onApplySelected={onApplySelected}
+        onCommit={onCommit}
+        onCommitMessageChange={onCommitMessageChange}
+        onRejectSelected={onRejectSelected}
+        onAction={onAction}
+      />
+      <ComposerV2 model="deepseek-v4-flash" prompt="" onChange={() => {}} onInterrupt={() => {}} onModelChange={() => {}} onSend={() => onAction(runtimeAvailable ? "Requested more tests for the selected change." : "Runtime is unavailable; diagnostics required before requesting tests.")} placeholder="Ask DeepSeek about this change..." />
     </div>
   );
 }
 
 function SettingsUsage({
+  accentColor,
   apiKeyDraft,
+  appearanceMode,
   baseURL,
+  diagnosticsResult,
+  hasAPIKey,
   health,
   info,
+  maxOutputTokens,
   model,
+  onAccentColorChange,
   onAPIKeyChange,
-  onAction,
+  onAppearanceModeChange,
+  onBaseURLChange,
+  onDeleteKey,
+  onManageAccount,
+  onMaxOutputTokensChange,
   onModelChange,
+  onPersistEndpoint,
+  onPersistModel,
+  onReasoningEffortChange,
+  onRotateKey,
+  onRunDiagnostics,
+  onTemperatureChange,
+  onTogglePreference,
+  reasoningEffort,
+  temperature,
+  temperatureError,
+  toggles,
   usage,
 }: {
+  accentColor: string;
   apiKeyDraft: string;
+  appearanceMode: string;
   baseURL: string;
+  diagnosticsResult?: string;
+  hasAPIKey: boolean;
   health?: RuntimeHealth;
   info?: RuntimeInfo;
+  maxOutputTokens: string;
   model: string;
+  onAccentColorChange(value: string): void;
   onAPIKeyChange(value: string): void;
-  onAction(message: string): void;
+  onAppearanceModeChange(value: string): void;
+  onBaseURLChange(value: string): void;
+  onPersistEndpoint(value: string): void;
+  onDeleteKey(): void;
+  onManageAccount(): void;
+  onMaxOutputTokensChange(value: string): void;
   onModelChange(value: string): void;
+  onPersistModel(value: string): void;
+  onReasoningEffortChange(value: string): void;
+  onRotateKey(): void;
+  onRunDiagnostics(): void;
+  onTemperatureChange(value: string): void;
+  onTogglePreference(label: string): void;
+  reasoningEffort: string;
+  temperature: string;
+  temperatureError?: string;
+  toggles: Record<string, boolean>;
   usage?: UsageAggregation;
 }) {
+  const apiKeyLabel = info?.mode === "fake" ? (hasAPIKey ? "Configured; not required in Demo Mode" : "Not required in Demo Mode") : (hasAPIKey ? "Configured" : "Required");
   return (
     <div className="page settings-page">
       <PageHeader title="Settings & Usage" />
@@ -937,7 +1446,7 @@ function SettingsUsage({
             <p>{info?.mode === "real" ? "Connected endpoint" : "Demo Mode"}</p>
             <small>{baseURL}</small>
           </div>
-          <button className="secondary-button" type="button" onClick={() => onAction("Account management is ready for native settings wiring.")}>Manage account</button>
+          <button className="secondary-button" type="button" onClick={onManageAccount}>Manage account</button>
         </div>
       </Card>
       <Card className="settings-card">
@@ -945,14 +1454,24 @@ function SettingsUsage({
           <KeyRound size={18} aria-hidden="true" />
           <div>
             <h3>API Key & Storage</h3>
-            <p>Your DeepSeek API key is securely encrypted and stored only in macOS Keychain.</p>
+            <p>API key status: {apiKeyLabel}. Keys are stored through the native Keychain bridge, not WebView localStorage.</p>
           </div>
         </div>
         <div className="settings-key-row">
-          <input className="field-input" type="password" value={apiKeyDraft} placeholder="sk-..." onChange={(event) => onAPIKeyChange(event.target.value)} />
-          <button className="secondary-button" type="button" onClick={() => onAction("API key rotation is ready for native Keychain wiring.")}>Rotate key</button>
-          <button className="icon-only" type="button" aria-label="More API key actions"><MoreHorizontal size={17} aria-hidden="true" /></button>
+          <input className="field-input" type="password" value={apiKeyDraft} placeholder={hasAPIKey ? "Saved in Keychain" : "Paste API key"} onChange={(event) => onAPIKeyChange(event.target.value)} />
+          <button className="secondary-button" type="button" onClick={onRotateKey}>Rotate key</button>
+          <button className="secondary-button danger" type="button" onClick={onDeleteKey} disabled={!hasAPIKey} title={hasAPIKey ? "Delete saved API key" : "No API key is saved."}>Delete key</button>
         </div>
+      </Card>
+      <Card className="settings-card">
+        <div className="settings-card-heading">
+          <Link2 size={18} aria-hidden="true" />
+          <div>
+            <h3>Endpoint</h3>
+            <p>HTTPS is recommended. HTTP is allowed for self-hosted or private-network endpoints.</p>
+          </div>
+        </div>
+        <input className="field-input" value={baseURL} onChange={(event) => onBaseURLChange(event.target.value)} onBlur={(event) => onPersistEndpoint(event.currentTarget.value)} />
       </Card>
       <Card className="settings-card">
         <div className="settings-card-heading">
@@ -962,14 +1481,13 @@ function SettingsUsage({
             <p>Only DeepSeek models are available in this app.</p>
           </div>
         </div>
-        <select className="field-input" value={model} onChange={(event) => onModelChange(event.target.value)}>
-          <option value="deepseek-v4-flash">deepseek-v4-flash</option>
-          <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+        <select aria-label="Settings model" className="field-input" value={model} onChange={(event) => { onModelChange(event.target.value); onPersistModel(event.target.value); }}>
+          {deepSeekModels.map((modelName) => <option key={modelName} value={modelName}>{modelName}</option>)}
         </select>
         <div className="settings-model-row">
-          <FieldLabel label="Temperature" value="0.2" />
-          <FieldLabel label="Reasoning effort" value="High" />
-          <FieldLabel label="Max output tokens" value="4096" />
+          <FieldLabel label="Temperature" value={temperature} error={temperatureError} onChange={onTemperatureChange} />
+          <FieldSelect label="Reasoning effort" value={reasoningEffort} options={["Low", "Medium", "High"]} onChange={onReasoningEffortChange} />
+          <FieldLabel label="Max output tokens" value={maxOutputTokens} onChange={onMaxOutputTokensChange} />
         </div>
       </Card>
       <Card className="settings-card">
@@ -980,7 +1498,7 @@ function SettingsUsage({
             <p>Default local folder and terminal behavior.</p>
           </div>
         </div>
-        <ToggleRows />
+        <ToggleRows toggles={toggles} onToggle={onTogglePreference} />
       </Card>
       <Card className="settings-card">
         <div className="settings-card-heading">
@@ -991,13 +1509,26 @@ function SettingsUsage({
         </div>
         <div className="appearance-row">
           <div className="segmented full">
-            <button className="active" type="button">Light</button>
-            <button type="button">Dark</button>
+            {["Light", "Dark"].map((modeName) => (
+              <button key={modeName} className={appearanceMode === modeName ? "active" : ""} type="button" onClick={() => onAppearanceModeChange(modeName)}>{modeName}</button>
+            ))}
           </div>
           <div className="appearance-swatches" aria-label="Accent colors">
-            <span /><span /><span /><span /><span /><span />
+            {["#3366ff", "#2563eb", "#0f766e", "#4f46e5", "#be123c", "#475569"].map((color) => (
+              <button key={color} className={accentColor === color ? "active" : ""} type="button" style={{ background: color }} aria-label={`Accent ${color}`} onClick={() => onAccentColorChange(color)} />
+            ))}
           </div>
         </div>
+      </Card>
+      <Card className="settings-card">
+        <div className="settings-card-heading">
+          <Gauge size={18} aria-hidden="true" />
+          <div>
+            <h3>Diagnostics</h3>
+            <p>{diagnosticsResult ?? "Run a local bridge/runtime diagnostic before handing the app to testers."}</p>
+          </div>
+        </div>
+        <button className="secondary-button" type="button" onClick={onRunDiagnostics}>Run diagnostics</button>
       </Card>
       <Card className="settings-card">
         <div className="settings-card-heading">
@@ -1008,11 +1539,9 @@ function SettingsUsage({
           </div>
         </div>
         <div className="usage-tabs">
-          <button className="active" type="button">Overview</button>
-          <button type="button">Token usage</button>
-          <button type="button">Recent runs</button>
-          <button type="button">Current model</button>
-          <button type="button">Cache</button>
+          {["Overview", "Token usage", "Recent runs", "Current model", "Cache"].map((tab, index) => (
+            <button key={tab} className={index === 0 ? "active" : ""} type="button" disabled={index === 0} title={index === 0 ? "Current usage view." : "Refresh diagnostics for this usage view."} onClick={() => onRunDiagnostics()}>{tab}</button>
+          ))}
         </div>
         <div className="usage-metrics">
           <MetricSmall label="Total tokens" value={((usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0)).toLocaleString()} delta="current runtime" />
@@ -1031,35 +1560,121 @@ function SettingsUsage({
   );
 }
 
+function AutomationsPage({ onAction }: { onAction(message: string): void }) {
+  return (
+    <div className="page skeleton-page">
+      <PageHeader title="Automations" subtitle="Scheduled DeepSeek Agent tasks">
+        <button className="primary-button" type="button" disabled title="Coming soon">New automation</button>
+      </PageHeader>
+      <Card className="empty-product-card">
+        <Sparkles size={24} aria-hidden="true" />
+        <h3>Automations are not configured yet</h3>
+        <p className="empty-state">Create scheduled tasks later to let DeepSeek watch and maintain projects.</p>
+        <div className="skeleton-actions">
+          <button className="secondary-button" type="button" onClick={() => onAction("Automation templates are coming soon in this alpha.")}>View planned templates</button>
+          <button className="secondary-button" type="button" disabled title="Runtime scheduler is not enabled in this MVP.">Run schedule now</button>
+        </div>
+      </Card>
+      <Card title="Planned automation types">
+        <div className="task-list">
+          {[
+            ["Nightly test sweep", "Run configured checks and summarize failures."],
+            ["Dependency watch", "Review dependency updates before applying."],
+            ["Release readiness", "Collect build, test, and packaging evidence."],
+          ].map(([title, body]) => (
+            <article key={title} className="task-item"><strong>{title}</strong><p>{body}</p><span>Coming soon</span></article>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function SkillsPage({ onAction }: { onAction(message: string): void }) {
+  return (
+    <div className="page skeleton-page">
+      <PageHeader title="Skills" subtitle="Project-specific DeepSeek workflows">
+        <button className="primary-button" type="button" disabled title="Coming soon">Import skill</button>
+      </PageHeader>
+      <Card className="empty-product-card">
+        <Layers3 size={24} aria-hidden="true" />
+        <h3>No skills installed yet</h3>
+        <p className="empty-state">Skills will help DeepSeek follow project-specific workflows.</p>
+        <div className="skeleton-actions">
+          <button className="secondary-button" type="button" onClick={() => onAction("Skill catalog preview is coming soon in this alpha.")}>Browse planned skills</button>
+          <button className="secondary-button" type="button" disabled title="Local skill import is not enabled in this MVP.">Validate skill</button>
+        </div>
+      </Card>
+      <Card title="Planned starter skills">
+        <div className="task-list">
+          {[
+            ["SwiftUI app review", "Check macOS views, state, and signing notes."],
+            ["WebView bridge audit", "Verify native-web command wiring and fallback behavior."],
+            ["Tester handoff", "Produce launch evidence and known issues."],
+          ].map(([title, body]) => (
+            <article key={title} className="task-item"><strong>{title}</strong><p>{body}</p><span>Coming soon</span></article>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function RightInspector({
+  acceptedCount,
+  commitMessage,
+  files,
+  hasAPIKey,
+  hasReviewChanges,
   health,
   info,
   isDemo,
   model,
   onAction,
+  onApplySelected,
+  onCommit,
+  onCommitMessageChange,
   onCreateThread,
+  onRejectSelected,
   onShowReview,
+  rejectedCount,
+  reviewDecisions,
   reviewedFiles,
+  runtimeAvailable,
+  selectedFiles,
   usage,
   view,
 }: {
+  acceptedCount: number;
+  commitMessage: string;
+  files: ReviewFile[];
+  hasAPIKey: boolean;
+  hasReviewChanges: boolean;
   health?: RuntimeHealth;
   info?: RuntimeInfo;
   isDemo: boolean;
   model: string;
   onAction(message: string): void;
+  onApplySelected(): void;
+  onCommit(): void;
+  onCommitMessageChange(value: string): void;
   onCreateThread(): void;
+  onRejectSelected(): void;
   onShowReview(): void;
+  rejectedCount: number;
+  reviewDecisions: Record<string, ReviewDecision>;
   reviewedFiles: Set<string>;
+  runtimeAvailable: boolean;
+  selectedFiles: Set<string>;
   usage?: UsageAggregation;
   view: AppView;
 }) {
-  if (view === "settings") {
+  if (view === "settings" || view === "automations" || view === "skills") {
     return (
       <aside className="right-inspector">
-        <InspectorHeader title="Account & Status" />
-        <InspectorCard title="DeepSeek Plan"><StatusValue label="Active" tone="ok" /></InspectorCard>
-        <RuntimeCard health={health} info={info} model={model} />
+        <InspectorHeader title={view === "settings" ? "Account & Status" : "Runtime"} />
+        <InspectorCard title={view === "settings" ? "DeepSeek Plan" : "Product state"}><StatusValue label={view === "settings" ? "Active" : "MVP skeleton"} tone="ok" /></InspectorCard>
+        <RuntimeCard hasAPIKey={hasAPIKey} health={health} info={info} model={model} />
         <InspectorCard title="Connection"><StatusValue label={health?.status === "ok" ? "Healthy" : "Needs attention"} tone={health?.status === "ok" ? "ok" : "danger"} /></InspectorCard>
         <InspectorCard title="Cost summary">
           <dl className="cost-list">
@@ -1073,30 +1688,34 @@ function RightInspector({
   }
 
   if (view === "review") {
-    const totalFiles = isDemo ? changedFiles.length : 0;
-    const reviewed = isDemo ? Math.min(reviewedFiles.size, totalFiles) : 0;
+    const totalFiles = files.length;
+    const reviewed = hasReviewChanges ? Math.min(reviewedFiles.size, totalFiles) : 0;
+    const selectedCount = selectedFiles.size;
+    const additions = files.reduce((total, file) => total + file.additions, 0);
+    const deletions = files.reduce((total, file) => total + file.deletions, 0);
     return (
       <aside className="right-inspector">
         <InspectorHeader title="Review" />
         <div className="segmented full">
-          <button className="active" type="button">Review</button>
-          <button type="button">Details</button>
+          <button className="active" type="button" disabled title="Current review panel.">Review</button>
+          <button type="button" disabled title="Detailed queue metadata is coming soon.">Details</button>
         </div>
         <InspectorCard title="Review queue">
           <p>{reviewed} of {totalFiles} files reviewed</p>
           <div className="progress"><span style={{ width: `${totalFiles === 0 ? 0 : Math.min(100, (reviewed / totalFiles) * 100)}%` }} /></div>
-          <div className="change-total"><span className="positive">+{isDemo ? 192 : 0} additions</span><span className="negative">-{isDemo ? 13 : 0} deletions</span></div>
+          <div className="change-total"><span className="positive">+{additions} additions</span><span className="negative">-{deletions} deletions</span></div>
         </InspectorCard>
-        {isDemo ? <FileQueue reviewedFiles={reviewedFiles} /> : <InspectorCard><p className="empty-state">No changed files yet.</p></InspectorCard>}
+        {hasReviewChanges ? <FileQueue files={files} reviewDecisions={reviewDecisions} reviewedFiles={reviewedFiles} /> : <InspectorCard><p className="empty-state">No changed files yet.</p></InspectorCard>}
         <InspectorCard title="Review actions">
-          <ActionButton label="Open in editor" onClick={() => onAction("Opening selected file in editor is queued.")} />
-          <ActionButton label="Apply selected" onClick={() => onAction(isDemo ? "Applied selected review changes in Demo Mode." : "No selected changes to apply.")} />
-          <ActionButton label="Reject selected" onClick={() => onAction(isDemo ? "Rejected selected review changes in Demo Mode." : "No selected changes to reject.")} />
-          <ActionButton label="Request more tests" onClick={() => onAction("Requested more tests for selected files.")} />
+          <ActionButton label="Open in editor" disabled={selectedCount === 0} disabledReason="Select a changed file first." onClick={() => onAction("Opening selected file in editor is queued.")} />
+          <ActionButton label="Apply selected" disabled={selectedCount === 0} disabledReason="No selected files to apply." onClick={onApplySelected} />
+          <ActionButton label="Reject selected" disabled={selectedCount === 0} disabledReason="No selected files to reject." onClick={onRejectSelected} />
+          <ActionButton label="Request more tests" disabled={!runtimeAvailable} disabledReason="Runtime must be connected before requesting tests." onClick={() => onAction("Requested more tests for selected files.")} />
         </InspectorCard>
         <InspectorCard title="Commit">
-          <input className="field-input" value={isDemo ? "Prepare local setup cleanup" : ""} placeholder="Commit message" readOnly />
-          <button className="primary-button full-width" type="button" onClick={() => onAction(isDemo ? "Commit preview is ready in Demo Mode." : "No changes are ready to commit.")}>Commit {isDemo ? reviewed : 0} files</button>
+          <input className="field-input" value={hasReviewChanges ? commitMessage : ""} placeholder="Commit message" onChange={(event) => onCommitMessageChange(event.target.value)} disabled={!hasReviewChanges} />
+          <button className="primary-button full-width" type="button" disabled={acceptedCount === 0 || !commitMessage.trim()} title={acceptedCount === 0 ? "Accept files before committing." : !commitMessage.trim() ? "Enter a commit message." : "Commit accepted files."} onClick={onCommit}>Commit {acceptedCount} {acceptedCount === 1 ? "file" : "files"}</button>
+          <p className="empty-state compact">Accepted {acceptedCount} {acceptedCount === 1 ? "file" : "files"} / Rejected {rejectedCount} {rejectedCount === 1 ? "file" : "files"}</p>
         </InspectorCard>
       </aside>
     );
@@ -1106,7 +1725,7 @@ function RightInspector({
     return (
       <aside className="right-inspector">
         <InspectorHeader title="Project" />
-        <RuntimeCard health={health} info={info} model={model} />
+        <RuntimeCard hasAPIKey={hasAPIKey} health={health} info={info} model={model} />
         <InspectorCard title="Quick actions">
           <ActionButton label="New thread" onClick={onCreateThread} />
           <ActionButton label="Run tests" onClick={() => onAction(isDemo ? "Queued Demo Mode test run." : "Create a thread before running agent checks.")} />
@@ -1114,7 +1733,7 @@ function RightInspector({
           <ActionButton label="Open in IDE" onClick={() => onAction("Opening project in IDE is queued.")} />
         </InspectorCard>
         <InspectorCard title="Top changed files">
-          {isDemo ? <FileQueue reviewedFiles={reviewedFiles} compact /> : <p className="empty-state">No changed files yet.</p>}
+          {isDemo && files.length ? <FileQueue files={files} reviewDecisions={reviewDecisions} reviewedFiles={reviewedFiles} compact /> : <p className="empty-state">No changed files yet.</p>}
         </InspectorCard>
         <InspectorCard title="Last commit">
           <p>{isDemo ? "Demo workspace checkpoint" : "No commit data loaded."}</p>
@@ -1131,38 +1750,51 @@ function RightInspector({
     <aside className="right-inspector">
       <InspectorHeader title="Review" />
       <div className="segmented full">
-        <button className="active" type="button">Summary</button>
-        <button type="button">Details</button>
+        <button className="active" type="button" disabled title="Current summary panel.">Summary</button>
+        <button type="button" disabled title="Detailed queue metadata is coming soon.">Details</button>
       </div>
       <InspectorCard>
-        <p>{isDemo ? "DeepSeek prepared a local setup preview with review and verification evidence." : "Start a thread to generate a summary for this workspace."}</p>
+        <p>{hasReviewChanges ? "DeepSeek prepared generated changes with review and verification evidence." : "Start an agent turn to generate reviewable changes for this thread."}</p>
       </InspectorCard>
       <InspectorCard title="Changes">
-        <div className="change-total"><span className="positive">+{isDemo ? 192 : 0} additions</span><span className="negative">-{isDemo ? 13 : 0} deletions</span></div>
+        <div className="change-total"><span className="positive">+{files.reduce((total, file) => total + file.additions, 0)} additions</span><span className="negative">-{files.reduce((total, file) => total + file.deletions, 0)} deletions</span></div>
       </InspectorCard>
-      <InspectorCard title={`Changed files (${isDemo ? changedFiles.length : 0})`}>{isDemo ? <FileQueue reviewedFiles={reviewedFiles} compact /> : <p className="empty-state">No changed files yet.</p>}</InspectorCard>
+      <InspectorCard title={`Changed files (${files.length})`}>{hasReviewChanges ? <FileQueue files={files} reviewDecisions={reviewDecisions} reviewedFiles={reviewedFiles} compact /> : <p className="empty-state">No changed files yet.</p>}</InspectorCard>
       <InspectorCard title="Quick actions">
         <ActionButton label="Open diff" onClick={onShowReview} />
-        <ActionButton label="Apply changes" onClick={() => onAction(isDemo ? "Applied changes in Demo Mode." : "No changes are available to apply.")} />
-        <ActionButton label="Request tests" onClick={() => onAction(isDemo ? "Requested tests in Demo Mode." : "No active changes need tests yet.")} />
+        <ActionButton label="Apply changes" disabled={!hasReviewChanges} disabledReason="No generated changes to apply yet." onClick={() => onAction("Applied changes in Demo Mode.")} />
+        <ActionButton label="Request tests" disabled={!runtimeAvailable || !hasReviewChanges} disabledReason={!runtimeAvailable ? "Runtime must be connected before requesting tests." : "No active changes need tests yet."} onClick={() => onAction("Requested tests in Demo Mode.")} />
       </InspectorCard>
-      <RuntimeCard health={health} info={info} model={model} />
+      <RuntimeCard hasAPIKey={hasAPIKey} health={health} info={info} model={model} />
     </aside>
   );
 }
 
-function TimelineCard({ item, onApprovalDecision }: { item: TimelineItem; onApprovalDecision(approvalId: string, decision: ApprovalDecision): void }) {
+function TimelineCard({ item, onApprovalDecision, onStopTask }: { item: TimelineItem; onApprovalDecision(approvalId: string, decision: ApprovalDecision): void; onStopTask(): void }) {
   if (item.kind === "approval" && item.approval) {
+    const isWaitingForDecision = item.status === "waiting" && !item.approval.decision;
+    const decisionLabel = item.status === "failed" ? "Stopped" : item.approval.decision === "allow" ? "Approved" : item.approval.decision === "deny" ? "Denied" : undefined;
     return (
       <Card className="timeline-card-v2 approval">
         <div className="timeline-card-heading"><span>Approval required</span><StatusPill status={item.status} /></div>
         <h3>{item.approval.title}</h3>
         <p>{item.approval.expectedSideEffect}</p>
+        <dl className="approval-meta">
+          <div><dt>Action</dt><dd>{item.approval.actionType}</dd></div>
+          <div><dt>Tool</dt><dd>{item.approval.toolName}</dd></div>
+          <div><dt>Target</dt><dd>{item.approval.cwd ?? "Current workspace"}</dd></div>
+          <div><dt>Risk</dt><dd>Medium; requires explicit tester approval</dd></div>
+        </dl>
         {item.approval.command ? <pre className="command-preview">{item.approval.command}</pre> : null}
-        <div className="approval-actions">
-          <button className="secondary-button" type="button" onClick={() => onApprovalDecision(item.approval!.approvalId, "deny")}>Deny</button>
-          <button className="primary-button" type="button" onClick={() => onApprovalDecision(item.approval!.approvalId, "allow")}>Allow</button>
-        </div>
+        {isWaitingForDecision ? (
+          <div className="approval-actions">
+            <button className="secondary-button" type="button" onClick={onStopTask}>Stop task</button>
+            <button className="secondary-button" type="button" onClick={() => onApprovalDecision(item.approval!.approvalId, "deny")}>Deny</button>
+            <button className="primary-button" type="button" onClick={() => onApprovalDecision(item.approval!.approvalId, "allow")}>Allow once</button>
+          </div>
+        ) : (
+          <p className="approval-decision">{decisionLabel ?? "Decision recorded"}</p>
+        )}
       </Card>
     );
   }
@@ -1178,16 +1810,16 @@ function TimelineCard({ item, onApprovalDecision }: { item: TimelineItem; onAppr
   );
 }
 
-function FilesChangedCard({ onOpenReview }: { onOpenReview(): void }) {
-  const additions = changedFiles.reduce((total, file) => total + file.additions, 0);
-  const deletions = changedFiles.reduce((total, file) => total + file.deletions, 0);
+function FilesChangedCard({ files, onOpenReview }: { files: ReviewFile[]; onOpenReview(): void }) {
+  const additions = files.reduce((total, file) => total + file.additions, 0);
+  const deletions = files.reduce((total, file) => total + file.deletions, 0);
   return (
     <Card className="files-card">
       <div className="card-title-row">
         <h3>Files changed</h3>
-        <span>{changedFiles.length} files <span className="positive">+{additions}</span> <span className="negative">-{deletions}</span></span>
+        <span>{files.length} files <span className="positive">+{additions}</span> <span className="negative">-{deletions}</span></span>
       </div>
-      <FilesChangedTable reviewedFiles={new Set()} onMarkReviewed={() => {}} />
+      <FilesChangedTable files={files} reviewedFiles={new Set()} selectedFiles={new Set(files.map((file) => file.path))} onToggleFile={() => {}} />
       <button className="text-button" type="button" onClick={onOpenReview}>Open review</button>
     </Card>
   );
@@ -1202,9 +1834,9 @@ function TerminalEvidenceCard({ compact = false }: { compact?: boolean }) {
         {!compact ? <span>21.6s</span> : null}
       </div>
       <pre className="terminal-output">{`> npm test
-	PASS tests/runtime-bridge.test.ts
-	PASS tests/setup-flow.test.ts
-	PASS tests/review-panel.test.ts
+	PASS runtime bridge checks
+	PASS setup flow checks
+	PASS review panel checks
 
 	Test Suites: 3 passed, 3 total
 	Tests:       18 passed, 18 total
@@ -1218,6 +1850,7 @@ function ComposerV2({
   model,
   onChange,
   onInterrupt,
+  onModelChange,
   onSend,
   placeholder = "Ask DeepSeek anything...",
   prompt,
@@ -1226,6 +1859,7 @@ function ComposerV2({
   model: string;
   onChange(value: string): void;
   onInterrupt(): void;
+  onModelChange(value: string): void;
   onSend(): void;
   placeholder?: string;
   prompt: string;
@@ -1234,8 +1868,18 @@ function ComposerV2({
     <form className="composer-v2" onSubmit={(event) => { event.preventDefault(); onSend(); }}>
       <textarea aria-label="Prompt" value={prompt} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
       <div className="composer-meta">
-        <span>{model}</span>
-        <button className="icon-only" type="button" aria-label="Attach file"><Link2 size={16} aria-hidden="true" /></button>
+        <select aria-label="Composer model" value={model} onChange={(event) => onModelChange(event.target.value)}>
+          {deepSeekModels.map((modelName) => <option key={modelName} value={modelName}>{modelName}</option>)}
+        </select>
+        <label className="icon-only file-attach" title="Attach a file">
+          <input type="file" aria-label="Attach file" onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            if (file) {
+              onChange(`${prompt}${prompt ? "\n" : ""}Attached file: ${file.name}`);
+            }
+          }} />
+          <Link2 size={16} aria-hidden="true" />
+        </label>
         <span className="composer-spacer" />
         {activeTurnId ? (
           <button className="secondary-button" type="button" onClick={onInterrupt}>
@@ -1261,6 +1905,107 @@ function PageHeader({ children, eyebrow, subtitle, title }: { children?: React.R
       </div>
       {children ? <div className="page-actions">{children}</div> : null}
     </header>
+  );
+}
+
+function StarterCanvas({ onChoosePrompt }: { onChoosePrompt(value: string): void }) {
+  return (
+    <Card className="starter-canvas">
+      <div>
+        <h3>New chat</h3>
+        <p>Start a focused DeepSeek Agent turn for this workspace.</p>
+      </div>
+      <div className="starter-prompts">
+        {suggestedPrompts.map(([title, body]) => (
+          <button key={title} type="button" onClick={() => onChoosePrompt(title)}>
+            <Sparkles size={16} aria-hidden="true" />
+            <span><strong>{title}</strong><small>{body}</small></span>
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function ReviewActionBar({
+  acceptedCount,
+  commitMessage,
+  hasChanges,
+  onApplySelected,
+  onCommit,
+  onCommitMessageChange,
+  onAction,
+  onRejectSelected,
+  runtimeAvailable,
+  selectedCount,
+}: {
+  acceptedCount: number;
+  commitMessage: string;
+  hasChanges: boolean;
+  onApplySelected(): void;
+  onCommit(): void;
+  onCommitMessageChange(value: string): void;
+  onAction(message: string): void;
+  onRejectSelected(): void;
+  runtimeAvailable: boolean;
+  selectedCount: number;
+}) {
+  return (
+    <div className="review-action-bar">
+      <button className="secondary-button" type="button" disabled={selectedCount === 0} title={selectedCount === 0 ? "Select a changed file first." : undefined} onClick={() => onAction("Opening selected file in editor is queued.")}>Open in editor</button>
+      <button className="secondary-button" type="button" disabled={selectedCount === 0} title={selectedCount === 0 ? "No selected files to apply." : undefined} onClick={onApplySelected}>Apply selected</button>
+      <button className="secondary-button danger" type="button" disabled={selectedCount === 0} title={selectedCount === 0 ? "No selected files to reject." : undefined} onClick={onRejectSelected}>Reject selected</button>
+      <button className="secondary-button" type="button" disabled={!runtimeAvailable || !hasChanges} title={!runtimeAvailable ? "Runtime must be connected before requesting tests." : !hasChanges ? "No changes need tests yet." : undefined} onClick={() => onAction("Requested more tests for selected files.")}>Request more tests</button>
+      <input className="commit-message-inline" value={hasChanges ? commitMessage : ""} placeholder="Commit message" disabled={!hasChanges} onChange={(event) => onCommitMessageChange(event.target.value)} />
+      <button className="primary-button" type="button" disabled={acceptedCount === 0 || !commitMessage.trim()} title={acceptedCount === 0 ? "Accept files before committing." : !commitMessage.trim() ? "Enter a commit message." : undefined} onClick={onCommit}>Commit {acceptedCount} {acceptedCount === 1 ? "file" : "files"}</button>
+    </div>
+  );
+}
+
+function SettingsModal({
+  apiKeyDraft,
+  hasAPIKey,
+  onAPIKeyChange,
+  onClose,
+  onDeleteKey,
+  onSaveKey,
+  sheet,
+}: {
+  apiKeyDraft: string;
+  hasAPIKey: boolean;
+  onAPIKeyChange(value: string): void;
+  onClose(): void;
+  onDeleteKey(): void;
+  onSaveKey(): void;
+  sheet: Exclude<SettingsSheet, null>;
+}) {
+  return (
+    <div className="sheet-backdrop" role="presentation" onClick={onClose}>
+      <section className="settings-sheet" role="dialog" aria-modal="true" aria-label={sheet === "rotateKey" ? "Rotate API key" : "Manage account"} onClick={(event) => event.stopPropagation()}>
+        <header className="sheet-header">
+          <h2>{sheet === "rotateKey" ? "Rotate API key" : "Manage account"}</h2>
+          <button className="icon-only" type="button" aria-label="Close sheet" onClick={onClose}><X size={16} aria-hidden="true" /></button>
+        </header>
+        {sheet === "rotateKey" ? (
+          <>
+            <p className="empty-state">Enter a new DeepSeek API key. The app saves it through the native Keychain bridge and then clears this field.</p>
+            <input className="field-input" type="password" value={apiKeyDraft} placeholder={hasAPIKey ? "New API key" : "Paste API key"} onChange={(event) => onAPIKeyChange(event.target.value)} autoFocus />
+            <div className="sheet-actions">
+              <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
+              <button className="secondary-button danger" type="button" disabled={!hasAPIKey} onClick={onDeleteKey}>Delete key</button>
+              <button className="primary-button" type="button" disabled={!apiKeyDraft.trim()} onClick={onSaveKey}>Save key</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="empty-state">DeepSeek account controls are local to this Mac for the MVP. API keys are configured through the Keychain section and model/runtime state is visible in the inspector.</p>
+            <div className="sheet-actions">
+              <button className="primary-button" type="button" onClick={onClose}>Done</button>
+            </div>
+          </>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -1302,13 +2047,26 @@ function ActivityList({ isDemo }: { isDemo: boolean }) {
   return <div className="activity-list">{["Checked runtime bridge contract", "Prepared setup flow review", "Collected terminal evidence", "Queued tester handoff"].map((item, index) => <article key={item}><span className="activity-dot" /><div><strong>{item}</strong><p>DeepSeek Agent</p></div><time>{index === 0 ? "now" : `${index}h ago`}</time></article>)}</div>;
 }
 
-function FilesChangedTable({ onMarkReviewed, reviewedFiles }: { onMarkReviewed(path: string): void; reviewedFiles: Set<string> }) {
+function FilesChangedTable({
+  files,
+  onToggleFile,
+  reviewDecisions = {},
+  reviewedFiles,
+  selectedFiles = new Set<string>(),
+}: {
+  files: ReviewFile[];
+  onToggleFile(path: string): void;
+  reviewDecisions?: Record<string, ReviewDecision>;
+  reviewedFiles: Set<string>;
+  selectedFiles?: Set<string>;
+}) {
   return (
     <div className="changed-table">
-      {changedFiles.map((file) => (
-        <button key={file.path} type="button" onClick={() => onMarkReviewed(file.path)}>
+      {files.map((file) => (
+        <button key={file.path} className={selectedFiles.has(file.path) ? "selected" : ""} type="button" aria-label={`Select ${file.path}`} aria-pressed={selectedFiles.has(file.path)} onClick={() => onToggleFile(file.path)}>
           <FileCode2 size={15} aria-hidden="true" />
           <span>{file.path}</span>
+          {reviewDecisions[file.path] ? <small className={`decision ${reviewDecisions[file.path]}`}>{reviewDecisions[file.path]}</small> : null}
           <strong className="positive">+{file.additions}</strong>
           <strong className="negative">-{file.deletions}</strong>
           {reviewedFiles.has(file.path) ? <CheckCircle2 size={15} aria-hidden="true" /> : null}
@@ -1318,18 +2076,18 @@ function FilesChangedTable({ onMarkReviewed, reviewedFiles }: { onMarkReviewed(p
   );
 }
 
-function FileQueue({ compact = false, reviewedFiles }: { compact?: boolean; reviewedFiles: Set<string> }) {
-  return <div className={compact ? "file-queue compact" : "file-queue"}>{changedFiles.map((file) => <div key={file.path}><span className={reviewedFiles.has(file.path) ? "queue-dot done" : "queue-dot"} /><span>{file.path}</span><strong className="positive">+{file.additions}</strong><strong className="negative">-{file.deletions}</strong></div>)}</div>;
+function FileQueue({ compact = false, files, reviewDecisions = {}, reviewedFiles }: { compact?: boolean; files: ReviewFile[]; reviewDecisions?: Record<string, ReviewDecision>; reviewedFiles: Set<string> }) {
+  return <div className={compact ? "file-queue compact" : "file-queue"}>{files.map((file) => <div key={file.path}><span className={reviewedFiles.has(file.path) ? "queue-dot done" : "queue-dot"} /><span>{file.path}</span>{reviewDecisions[file.path] ? <small className={`decision ${reviewDecisions[file.path]}`}>{reviewDecisions[file.path]}</small> : null}<strong className="positive">+{file.additions}</strong><strong className="negative">-{file.deletions}</strong></div>)}</div>;
 }
 
-function RuntimeCard({ health, info, model }: { health?: RuntimeHealth; info?: RuntimeInfo; model: string }) {
+function RuntimeCard({ hasAPIKey, health, info, model }: { hasAPIKey: boolean; health?: RuntimeHealth; info?: RuntimeInfo; model: string }) {
   return (
     <InspectorCard title="Runtime">
       <div className="runtime-line"><span className={`status-dot ${health?.status === "ok" ? "ok" : "offline"}`} /> deepseek-runtime-api</div>
       <dl className="runtime-list">
         <div><dt>Mode</dt><dd>{info?.mode === "fake" ? "demo" : info?.mode ?? "unknown"}</dd></div>
         <div><dt>Runtime</dt><dd>{info?.runtimeVersion ?? "not probed"}</dd></div>
-        <div><dt>API key</dt><dd>{info?.authRequired ? "Required" : "Not required"}</dd></div>
+        <div><dt>API key</dt><dd>{runtimeAPIKeyStatusLabel(info, hasAPIKey)}</dd></div>
         <div><dt>Model</dt><dd>{model}</dd></div>
       </dl>
     </InspectorCard>
@@ -1341,11 +2099,11 @@ function InspectorCard({ children, title }: { children?: React.ReactNode; title?
 }
 
 function InspectorHeader({ title }: { title: string }) {
-  return <header className="inspector-header"><h2>{title}</h2><button className="icon-only" type="button"><X size={16} aria-hidden="true" /></button></header>;
+  return <header className="inspector-header"><h2>{title}</h2><button className="icon-only" type="button" disabled title="Inspector stays visible in this MVP." aria-label="Close inspector"><X size={16} aria-hidden="true" /></button></header>;
 }
 
-function ActionButton({ label, onClick }: { label: string; onClick(): void }) {
-  return <button className="action-button" type="button" onClick={onClick}>{label}</button>;
+function ActionButton({ disabled = false, disabledReason, label, onClick }: { disabled?: boolean; disabledReason?: string; label: string; onClick(): void }) {
+  return <button className="action-button" type="button" disabled={disabled} title={disabled ? disabledReason : undefined} onClick={onClick}>{label}</button>;
 }
 
 function StatusValue({ label, tone }: { label: string; tone: "ok" | "danger" }) {
@@ -1368,10 +2126,6 @@ function BrandTitle() {
   return <div className="brand-title"><PanelLeft size={18} aria-hidden="true" /><strong>DeepSeek Agent</strong><ChevronDown size={14} aria-hidden="true" /></div>;
 }
 
-function TrafficLights() {
-  return <div className="traffic-lights" aria-hidden="true"><span /><span /><span /></div>;
-}
-
 function NavButton({ active = false, icon, label, onClick }: { active?: boolean; icon: React.ReactNode; label: string; onClick?: () => void }) {
   return <button className={active ? "nav-button active" : "nav-button"} type="button" onClick={onClick}>{icon}{label}</button>;
 }
@@ -1384,35 +2138,22 @@ function StatusPill({ status }: { status: TimelineItem["status"] }) {
   return <span className={`status-pill status-${status}`}>{status === "completed" ? <CheckCircle2 size={14} aria-hidden="true" /> : <Clock3 size={14} aria-hidden="true" />}{status}</span>;
 }
 
-function FieldLabel({ label, value }: { label: string; value: string }) {
-  return <label className="field-label"><span>{label}</span><input value={value} readOnly /></label>;
+function FieldLabel({ error, label, onChange, value }: { error?: string; label: string; onChange(value: string): void; value: string }) {
+  return <label className="field-label"><span>{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} />{error ? <small className="field-error">{error}</small> : null}</label>;
+}
+
+function FieldSelect({ label, onChange, options, value }: { label: string; onChange(value: string): void; options: string[]; value: string }) {
+  return <label className="field-label"><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
 }
 
 function MetricSmall({ delta, label, value }: { delta: string; label: string; value: string }) {
   return <div className="usage-metric"><span>{label}</span><strong>{value}</strong><small>{delta}</small></div>;
 }
 
-function ToggleRows() {
-  return <div className="toggle-rows">{["Auto-apply safe edits", "Confirm destructive actions", "Code suggestions"].map((label) => <div key={label}><span>{label}</span><button className="toggle on" type="button" aria-pressed="true"><span /></button></div>)}</div>;
+function ToggleRows({ onToggle, toggles }: { onToggle(label: string): void; toggles: Record<string, boolean> }) {
+  return <div className="toggle-rows">{Object.entries(toggles).map(([label, enabled]) => <div key={label}><span>{label}</span><button className={enabled ? "toggle on" : "toggle"} type="button" aria-label={label} aria-pressed={enabled} onClick={() => onToggle(label)}><span /></button></div>)}</div>;
 }
 
 function UsageChart() {
   return <div className="usage-chart"><svg viewBox="0 0 600 140" role="img" aria-label="Usage trend"><path d="M0 90 C80 30 120 120 200 70 S340 65 420 86 520 45 600 72" fill="none" stroke="#3366FF" strokeWidth="4" /><path d="M0 100 C80 80 120 92 200 88 S340 95 420 90 520 76 600 82" fill="none" stroke="#7FA8FF" strokeWidth="3" /></svg></div>;
 }
-
-const fallbackTimeline: TimelineItem[] = [
-  {
-    id: "fallback-user",
-    kind: "user",
-    title: "You",
-    content: "Inspect this workspace and show how setup, review, approvals, and local verification will work for a tester.",
-    status: "completed",
-  },
-  {
-    id: "fallback-agent",
-    kind: "assistant",
-    title: "DeepSeek Agent",
-    content: "Demo Mode is connected. I can show the local setup flow, review workspace, terminal evidence, and approval handling without requiring an API key.",
-    status: "completed",
-  },
-];

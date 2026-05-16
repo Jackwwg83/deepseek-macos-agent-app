@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 APP_NAME="${DEEPSEEK_AGENT_APP_NAME:-DeepSeek Agent}"
 BUNDLE_ID="${DEEPSEEK_AGENT_BUNDLE_ID:-app.deepseek.agent}"
-VERSION="${DEEPSEEK_AGENT_VERSION:-0.1.0-alpha.6}"
+VERSION="${DEEPSEEK_AGENT_VERSION:-0.1.0-alpha.7}"
 BUILD_ROOT="${DEEPSEEK_AGENT_BUILD_ROOT:-$ROOT/build/tester-alpha}"
 PACKAGE_DIR="$BUILD_ROOT/DeepSeek-Agent-alpha-macos"
 APP_DIR="$PACKAGE_DIR/$APP_NAME.app"
@@ -117,15 +117,15 @@ DeepSeek Agent App alpha for macOS testers
 How to run:
 1. Open "DeepSeek Agent.app".
 2. Complete the First Run Setup screen.
-3. To try the app without credentials, leave Demo Mode enabled and click "Complete Setup".
-4. To run real DeepSeek mode, turn Demo Mode off, enter your DeepSeek-compatible URL, API key, and model, then click "Complete Setup".
+3. Enter your DeepSeek-compatible URL, API key, and model, then click "Complete Setup".
    Example URLs: https://api.deepseek.com/beta, https://your-host/v1, or http://your-self-hosted-server:port/v1.
-5. Your API key is saved to macOS Keychain and cleared from the setup field after submit.
+4. Your API key is saved to macOS Keychain and cleared from the setup field after submit.
+5. Optional: enable Demo Mode only for offline UI diagnostics without a real endpoint.
 
 Notes:
 - The DeepSeek-TUI runtime is bundled inside the app; testers do not need to install it separately.
 - HTTPS is recommended. HTTP is allowed for self-hosted or private-network endpoints, and the app shows a warning because API keys are not protected by TLS on HTTP.
-- This is an unsigned/notarization-free alpha package. If macOS blocks it after download, right-click the app and choose Open, or run:
+- This is an ad-hoc signed, not notarized alpha package. If macOS blocks it after download, right-click the app and choose Open, or run:
   xattr -dr com.apple.quarantine "DeepSeek Agent.app"
 - The app binds the local runtime only to 127.0.0.1 and generates a fresh runtime bearer token per launch.
 - API keys are not stored in files in this package.

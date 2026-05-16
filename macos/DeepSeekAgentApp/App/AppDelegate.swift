@@ -55,7 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        guard let apiKey = try? RuntimeSecretResolver.resolveAPIKey(environment: environment, keychainAPIKey: keychainStore.readAPIKey),
+        guard let apiKey = try? RuntimeSecretResolver.resolveAPIKey(environment: environment, keychainAPIKey: { nil }),
               !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeepSeek Agent PRD / User Journey Pack</title>
+  <style>
+    :root{
+      --bg:#f6f8ff; --panel:#ffffff; --text:#0f172a; --muted:#64748b;
+      --line:#dbe3f0; --blue:#3567ff; --soft:#eef3ff; --green:#16a34a;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;color:var(--text);background:linear-gradient(135deg,#edf4ff,#f8f6ff 45%,#ffffff)}
+    header{padding:48px 56px 24px;max-width:1180px;margin:0 auto}
+    h1{font-size:40px;line-height:1.1;margin:0 0 12px;font-weight:760;letter-spacing:-0.04em}
+    .subtitle{font-size:18px;color:var(--muted);max-width:820px;line-height:1.6}
+    main{max-width:1180px;margin:0 auto;padding:0 56px 64px}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:28px 0}
+    .card{background:rgba(255,255,255,.82);border:1px solid var(--line);box-shadow:0 14px 40px rgba(31,44,71,.08);border-radius:20px;padding:22px;backdrop-filter:blur(18px)}
+    .card h2{margin:0 0 10px;font-size:20px;letter-spacing:-.02em}
+    .card p{margin:0;color:var(--muted);line-height:1.55}
+    .links a{display:block;padding:10px 12px;margin:6px 0;border:1px solid var(--line);background:#fff;border-radius:12px;text-decoration:none;color:var(--text)}
+    .links a:hover{border-color:#9bb5ff;background:var(--soft)}
+    .mockups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:22px}
+    figure{margin:0;background:#fff;border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(31,44,71,.07)}
+    figure img{display:block;width:100%;height:auto}
+    figcaption{padding:12px 14px;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
+    .badge{display:inline-flex;gap:6px;align-items:center;border:1px solid #b7c6ff;color:#2646b8;background:#eef3ff;border-radius:999px;padding:6px 10px;font-weight:650;font-size:13px;margin-bottom:16px}
+    .section-title{font-size:28px;letter-spacing:-.03em;margin:40px 0 12px}
+    code,pre{font-family:"SF Mono",Menlo,monospace}
+    pre{background:#0f172a;color:#e5eefb;border-radius:16px;padding:16px;overflow:auto}
+    ul{color:var(--muted);line-height:1.7}
+    @media(max-width:900px){header,main{padding-left:24px;padding-right:24px}.grid,.mockups{grid-template-columns:1fr}h1{font-size:32px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="badge">DeepSeek-only · macOS-only · PRD + User Journey</div>
+    <h1>DeepSeek Agent macOS App 产品交互总包</h1>
+    <p class="subtitle">这套文档用于指导 Codex 从静态 UI 继续迭代成可测试、可点击、可信任的 MVP。核心约束：DeepSeek-TUI 是 runtime sidecar，App 负责产品壳、用户旅程、设置、审查和可视化。</p>
+  </header>
+  <main>
+    <section class="grid">
+      <div class="card">
+        <h2>核心产品路径</h2>
+        <p>First Run Setup → Project Command Center → New Thread → Agent Turn → Approval → Review Changes → Apply/Reject → Settings & Usage。</p>
+      </div>
+      <div class="card">
+        <h2>Codex 不可偏离的范围</h2>
+        <p>不做多 provider，不重写 TUI runtime，不留静态假按钮，不弹系统钥匙串密码框，不画假的 macOS 窗口 chrome。</p>
+      </div>
+      <div class="card links">
+        <h2>主文档</h2>
+        <a href="PRD.md">PRD.md</a>
+        <a href="docs/01_USER_JOURNEYS.md">01 用户旅程</a>
+        <a href="docs/02_OPERATION_LOGIC.md">02 操作逻辑</a>
+        <a href="docs/03_FEATURE_CATALOG.md">03 功能清单</a>
+        <a href="docs/04_SCREEN_AND_MENU_SPEC.md">04 页面与菜单</a>
+        <a href="docs/05_STATE_PERMISSION_AND_ERROR_MODEL.md">05 状态、权限与错误</a>
+        <a href="docs/07_ACCEPTANCE_CHECKLIST.md">07 验收清单</a>
+      </div>
+      <div class="card links">
+        <h2>给 Codex 的文件</h2>
+        <a href="codex/CODEX_PRODUCT_GOAL.md">CODEX_PRODUCT_GOAL.md</a>
+        <a href="codex/AGENTS_PRODUCT.md">AGENTS_PRODUCT.md</a>
+        <a href="docs/06_CODEX_IMPLEMENTATION_GUIDE.md">Codex 实现指南</a>
+        <a href="tokens/product_scope.json">product_scope.json</a>
+      </div>
+    </section>
+
+    <h2 class="section-title">推荐给 Codex 的 Goal</h2>
+    <pre>/goal Implement codex/CODEX_PRODUCT_GOAL.md. Keep iterating until the product journey works end-to-end in Demo Mode, the app has no fake macOS chrome or blue background bleed, no Keychain password prompt appears, all visible controls are either wired or explicitly disabled, and all acceptance checks in docs/07_ACCEPTANCE_CHECKLIST.md pass.</pre>
+
+    <h2 class="section-title">参考效果图</h2>
+    <div class="mockups">
+      <figure><img src="mockups/01_active_thread_main.png" alt="Active Thread"/><figcaption>Active Thread + Review Inspector</figcaption></figure>
+      <figure><img src="mockups/02_first_run_setup.png" alt="First Run Setup"/><figcaption>First Run Setup</figcaption></figure>
+      <figure><img src="mockups/03_project_command_center.png" alt="Project Command Center"/><figcaption>Project Command Center</figcaption></figure>
+      <figure><img src="mockups/04_review_changes.png" alt="Review Changes"/><figcaption>Review Changes</figcaption></figure>
+      <figure><img src="mockups/05_settings_usage.png" alt="Settings Usage"/><figcaption>Settings & Usage</figcaption></figure>
+    </div>
+  </main>
+</body>
+</html>

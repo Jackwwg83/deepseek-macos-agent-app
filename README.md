@@ -8,7 +8,7 @@ It bundles the web UI and a `deepseek-tui` sidecar. Test users do not need to in
 
 Latest tester alpha:
 
-[DeepSeek Agent v0.1.0-alpha.6](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.6)
+[DeepSeek Agent v0.1.0-alpha.7](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.7)
 
 Download:
 
@@ -28,8 +28,8 @@ Steps:
 2. Unzip it.
 3. Open `DeepSeek Agent.app`.
 4. Complete the First Run Setup screen.
-5. For Demo Mode, leave Demo Mode enabled and click `Complete Setup`; no API key is required.
-6. For real DeepSeek mode, turn Demo Mode off, enter your DeepSeek-compatible URL, API key, and model, then click `Complete Setup`.
+5. Enter your DeepSeek-compatible URL, API key, and model, then click `Complete Setup`.
+6. Optional: enable Demo Mode only when you want an offline UI check without sending requests to a real endpoint.
 
 The API key is stored in macOS Keychain. The app starts the bundled sidecar on `127.0.0.1` with a fresh bearer token for each launch.
 
@@ -64,8 +64,8 @@ The bundled sidecar is used by default.
 - API-key storage through macOS Keychain
 - WKWebView command center UI
 - React/TypeScript embedded UI
-- Demo Mode runtime for offline UI testing
 - Real DeepSeek-TUI HTTP/SSE runtime adapter
+- Optional Demo Mode runtime for offline UI testing
 - Bundled `deepseek-tui` sidecar in the tester package
 - Package verification scripts and checksums
 
@@ -92,7 +92,7 @@ Run the full validation suite:
 bash scripts/dev/check.sh
 ```
 
-Launch a short Demo Mode smoke:
+Launch an optional Demo Mode smoke:
 
 ```bash
 bash scripts/dev/run_fake_runtime.sh
@@ -138,6 +138,8 @@ The current tester package is validated with:
 
 - `bash scripts/dev/check.sh`
 - `bash scripts/dev/verify_tester_alpha.sh`
+- real packaged app launch probe with configured URL/key/model
+- packaged app interaction probe for optional Demo Mode setup, new thread, prompt send, approval card, `Allow once`, Review Changes, `Apply selected`, and `Commit 1 file` enablement
 - native startup readiness retry tests
 - packaged app WebView render probe
 - bundled sidecar `/health` smoke
@@ -164,6 +166,9 @@ docs/       Product, architecture, security, test, and delivery docs
 ## Documentation
 
 - [Tester alpha delivery](docs/TESTER_ALPHA_DELIVERY.md)
+- [Implementation progress](docs/IMPLEMENTATION_PROGRESS.md)
+- [UI QA results](docs/UI_QA_RESULTS.md)
+- [Known issues](docs/KNOWN_ISSUES.md)
 - [Product spec](docs/01_PRODUCT_SPEC.md)
 - [Architecture](docs/02_ARCHITECTURE.md)
 - [Runtime adapter](docs/03_RUNTIME_ADAPTER.md)

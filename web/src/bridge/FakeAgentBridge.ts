@@ -30,6 +30,12 @@ export class FakeAgentBridge implements AgentBridge {
   private seq = 0;
   private subscribers = new Map<string, Set<Subscriber>>();
   private completedTurns = 0;
+  private settings: RuntimeSettingsSnapshot = {
+    baseURL: "https://api.deepseek.com/beta",
+    model: "deepseek-v4-flash",
+    sidecarPath: "",
+    hasAPIKey: false,
+  };
 
   constructor(projectPath = "~/Projects") {
     const now = new Date().toISOString();
@@ -65,21 +71,22 @@ export class FakeAgentBridge implements AgentBridge {
   }
 
   async getRuntimeSettings(): Promise<RuntimeSettingsSnapshot> {
-    return {
-      baseURL: "https://api.deepseek.com/beta",
-      model: "deepseek-v4-flash",
-      sidecarPath: "",
-      hasAPIKey: false,
-    };
+    return { ...this.settings };
   }
 
   async saveRuntimeSettings(req: SaveRuntimeSettingsRequest): Promise<RuntimeSettingsSnapshot> {
-    return {
+    this.settings = {
       baseURL: req.baseURL,
       model: req.model,
-      sidecarPath: req.sidecarPath ?? "",
-      hasAPIKey: Boolean(req.apiKey?.trim()),
+      sidecarPath: req.sidecarPath ?? this.settings.sidecarPath,
+      hasAPIKey: this.settings.hasAPIKey || Boolean(req.apiKey?.trim()),
     };
+    return { ...this.settings };
+  }
+
+  async clearAPIKey(): Promise<RuntimeSettingsSnapshot> {
+    this.settings = { ...this.settings, hasAPIKey: false };
+    return { ...this.settings };
   }
 
   async useDemoRuntime(): Promise<RuntimeSettingsSnapshot> {
@@ -178,6 +185,13 @@ export class FakeAgentBridge implements AgentBridge {
 
   async interruptTurn(threadId: string, turnId: string): Promise<RuntimeTurn> {
     this.emit(threadId, "turn.interrupt_requested", { turnId }, turnId);
+    this.emit(threadId, "item.failed", { itemId: `${turnId}-approval`, message: "Task stopped before approval." }, turnId);
+    this.emit(threadId, "item.delta", {
+      itemId: `${turnId}-assistant`,
+      delta: "Task stopped before running the command.",
+    }, turnId);
+    this.emit(threadId, "item.completed", { itemId: `${turnId}-assistant` }, turnId);
+    this.emit(threadId, "turn.completed", { turnId }, turnId);
     return { id: turnId, threadId, status: "interrupted" };
   }
 
@@ -289,6 +303,10 @@ function materializeItems(items: TimelineItem[], event: RuntimeEvent): TimelineI
     case "item.completed": {
       const payload = event.payload as Extract<RuntimeEvent["payload"], { itemId: string }>;
       return items.map((item) => (item.id === payload.itemId ? { ...item, status: "completed" } : item));
+    }
+    case "item.failed": {
+      const payload = event.payload as Extract<RuntimeEvent["payload"], { itemId: string; message: string }>;
+      return items.map((item) => (item.id === payload.itemId ? { ...item, content: payload.message, status: "failed" } : item));
     }
     case "approval.required": {
       const payload = event.payload as Extract<RuntimeEvent["payload"], { expectedSideEffect: string }>;

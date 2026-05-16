@@ -31,9 +31,9 @@ Steps:
 1. Unzip `DeepSeek-Agent-alpha-macos.zip`.
 2. Open `DeepSeek Agent.app`.
 3. Complete the First Run Setup screen.
-4. To explore without credentials, leave Demo Mode enabled and click `Complete Setup`.
-5. To run real DeepSeek mode, turn Demo Mode off, enter the DeepSeek URL, API key, and model, then click `Complete Setup`.
-6. The app saves the API key to macOS Keychain and clears the setup field after submit.
+4. Enter the DeepSeek URL, API key, and model, then click `Complete Setup`.
+5. The app saves the API key to macOS Keychain and clears the setup field after submit.
+6. Optional: enable Demo Mode only for offline UI diagnostics without a real endpoint.
 
 The app bundles `deepseek-tui`; testers do not need Rust, Node, Xcode, or a separate DeepSeek-TUI install.
 
@@ -72,7 +72,7 @@ DeepSeek Agent.app/Contents/Resources/THIRD_PARTY_NOTICES.txt
 - `bin/deepseek-tui` is bundled and executable.
 - Third-party notices and license are present.
 - Ad-hoc code signature verifies when `codesign` is available.
-- Packaged app launches in fake mode and renders the embedded WebView fake runtime demo through the native bridge.
+- Packaged app launches in fake mode and renders the embedded WebView through the native bridge.
 - Bundled DeepSeek-TUI sidecar responds to `/health`.
 - Zip checksum verifies.
 - Package text does not contain the provided concrete API key or private endpoint.
@@ -82,4 +82,11 @@ Current closeout evidence:
 - `bash scripts/dev/check.sh` reports `check-ok`.
 - `bash scripts/dev/verify_tester_alpha.sh` reports `packaged-app-render-ok`, `packaged-sidecar-health-ok`, and `verify-tester-alpha-ok`.
 - A real bundled-sidecar model-turn smoke completed against a third-party OpenAI-compatible HTTPS endpoint using a user-supplied key and model.
-- A real packaged-app launch probe reached `REAL` mode without runtime decode/boot errors.
+- A real packaged-app launch probe reached `real` mode with the configured model and API key status shown as configured.
+- Optional Demo Mode interaction probe reports `interactionPassed: true` for setup, new thread, send prompt, approval card, `Allow once`, `Review changes`, file selection, `Apply selected`, and `Commit 1 file` enablement.
+
+See also:
+
+- `docs/IMPLEMENTATION_PROGRESS.md`
+- `docs/UI_QA_RESULTS.md`
+- `docs/KNOWN_ISSUES.md`

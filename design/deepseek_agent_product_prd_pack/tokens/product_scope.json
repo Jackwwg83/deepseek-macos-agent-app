@@ -1,0 +1,35 @@
+{
+  "product": "DeepSeek Agent macOS App",
+  "scope": {
+    "platform": "macOS only",
+    "provider": "DeepSeek only",
+    "runtime": "DeepSeek-TUI sidecar or FakeRuntimeAdapter",
+    "firstVersion": "MVP with demo mode, thread, review, settings"
+  },
+  "allowedModels": [
+    "deepseek-v4-flash",
+    "deepseek-v4-pro"
+  ],
+  "globalModes": [
+    "demo",
+    "real"
+  ],
+  "primaryFlows": [
+    "first_run_setup",
+    "project_command_center",
+    "new_thread",
+    "agent_turn",
+    "approval",
+    "review_changes",
+    "settings_usage"
+  ],
+  "forbidden": [
+    "non_deepseek_providers",
+    "fake_macos_window_chrome_inside_content",
+    "large_marketing_gradient_inside_app_content",
+    "system_keychain_password_prompt_as_normal_flow",
+    "visible_buttons_without_handlers",
+    "terminal_output_scraping",
+    "runtime_rewrite"
+  ]
+}

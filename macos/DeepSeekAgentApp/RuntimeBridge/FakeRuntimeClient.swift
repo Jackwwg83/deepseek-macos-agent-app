@@ -203,6 +203,7 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
     func subscribeEvents(threadId: String, sinceSeq: Int?) -> AsyncThrowingStream<RuntimeEvent, Error> {
         AsyncThrowingStream { continuation in
             let id = UUID()
+            self.traceFakeEvent("subscribe.\(threadId).\(id.uuidString)")
             queue.async {
                 let replay = self.threads
                     .first(where: { $0.thread.id == threadId })?
@@ -212,10 +213,12 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
                 var bucket = self.continuations[threadId, default: [:]]
                 bucket[id] = continuation
                 self.continuations[threadId] = bucket
+                self.traceFakeEvent("subscribers.\(threadId).\(bucket.count)")
             }
             continuation.onTermination = { _ in
                 self.queue.async {
                     self.continuations[threadId]?.removeValue(forKey: id)
+                    self.traceFakeEvent("terminated.\(threadId).\(id.uuidString)")
                 }
             }
         }
@@ -223,6 +226,7 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
 
     @discardableResult
     private func emitLocked(threadId: String, event: String, payload: JSONValue, turnId: String? = nil) -> RuntimeEvent {
+        traceFakeEvent(event)
         seq += 1
         let runtimeEvent = RuntimeEvent(seq: seq, event: event, threadId: threadId, turnId: turnId, payload: payload, createdAt: isoNow())
         guard let index = threads.firstIndex(where: { $0.thread.id == threadId }) else {
@@ -231,8 +235,25 @@ final class FakeRuntimeClient: AgentRuntimeClient, @unchecked Sendable {
         threads[index].events.append(runtimeEvent)
         threads[index].thread.updatedAt = runtimeEvent.createdAt
         threads[index].items = materialize(items: threads[index].items, event: runtimeEvent)
+        traceFakeEvent("subscribers.\(threadId).\(continuations[threadId]?.count ?? 0)")
         continuations[threadId]?.values.forEach { $0.yield(runtimeEvent) }
         return runtimeEvent
+    }
+
+    private func traceFakeEvent(_ event: String) {
+        guard let path = ProcessInfo.processInfo.environment["DEEPSEEK_AGENT_BRIDGE_TRACE_PATH"], !path.isEmpty else {
+            return
+        }
+        let line = "\(Date().timeIntervalSince1970) fake \(event)\n"
+        let url = URL(fileURLWithPath: path)
+        if FileManager.default.fileExists(atPath: path),
+           let handle = try? FileHandle(forWritingTo: url) {
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? line.write(to: url, atomically: true, encoding: .utf8)
+        }
     }
 
     private func materialize(items: [TimelineItem], event: RuntimeEvent) -> [TimelineItem] {

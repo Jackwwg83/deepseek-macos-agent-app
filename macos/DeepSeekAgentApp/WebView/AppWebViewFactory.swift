@@ -26,15 +26,27 @@ enum AppWebViewFactory {
             bridge = runtimeBridge
         }
 
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let probe: AppWebViewProbe?
         if let probePath = environment["DEEPSEEK_AGENT_WEBVIEW_PROBE_PATH"], !probePath.isEmpty {
-            let probe = AppWebViewProbe(outputURL: URL(fileURLWithPath: probePath))
+            let configuredProbe = AppWebViewProbe(
+                outputURL: URL(fileURLWithPath: probePath),
+                runInteractionProbe: environment["DEEPSEEK_AGENT_WEBVIEW_INTERACTION_PROBE"] == "1"
+            )
+            configuration.userContentController.add(configuredProbe, contentWorld: .page, name: "deepseekAgentProbe")
+            probe = configuredProbe
+        } else {
+            probe = nil
+        }
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        if let probe {
             webView.navigationDelegate = probe
             objc_setAssociatedObject(webView, &AssociatedKeys.probe, probe, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
         bridge?.attach(to: webView)
-        webView.customUserAgent = "DeepSeekAgentApp/0.1.0"
+        webView.customUserAgent = "DeepSeekAgentApp/0.1.0-alpha.7"
         loadContent(in: webView, environment: environment)
+        probe?.scheduleWork(in: webView)
         if let bridge {
             objc_setAssociatedObject(webView, &AssociatedKeys.bridge, bridge, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
@@ -85,10 +97,10 @@ enum AppWebViewFactory {
       <head>
         <meta charset="utf-8">
         <style>
-          body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f4f1e8; color: #25352c; }
+          body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #ffffff; color: #101828; }
           main { display: grid; place-items: center; min-height: 100vh; padding: 32px; }
-          section { max-width: 640px; background: white; border: 1px solid #dfddcf; border-radius: 8px; padding: 24px; }
-          code { background: #172119; color: #f4f1e8; padding: 2px 5px; border-radius: 4px; }
+          section { max-width: 640px; background: white; border: 1px solid rgba(16, 24, 40, 0.12); border-radius: 8px; padding: 24px; }
+          code { background: #f1f3f5; color: #101828; padding: 2px 5px; border-radius: 4px; }
         </style>
       </head>
       <body>
@@ -108,20 +120,172 @@ private enum AssociatedKeys {
     static var probe: UInt8 = 0
 }
 
-private final class AppWebViewProbe: NSObject, WKNavigationDelegate {
+private final class AppWebViewProbe: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     private let outputURL: URL
+    private let runInteractionProbe: Bool
+    private var didScheduleWork = false
 
-    init(outputURL: URL) {
+    init(outputURL: URL, runInteractionProbe: Bool = false) {
         self.outputURL = outputURL
+        self.runInteractionProbe = runInteractionProbe
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        scheduleWork(in: webView)
+    }
+
+    func scheduleWork(in webView: WKWebView) {
+        guard !didScheduleWork else {
+            return
+        }
+        didScheduleWork = true
+        if runInteractionProbe {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak webView, outputURL] in
+                guard let webView else { return }
+                Self.runInteractionProbe(in: webView, outputURL: outputURL)
+            }
+            return
+        }
         writeSnapshot(from: webView, event: "didFinish", delaySeconds: 0)
         for delay in [0.5, 1.5, 4.0, 8.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak webView, outputURL] in
                 guard let webView else { return }
                 Self.writeSnapshot(from: webView, to: outputURL, event: "snapshot", delaySeconds: delay)
             }
+        }
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if let body = message.body as? String {
+            Self.writeRaw(body, to: outputURL)
+        } else if let data = try? JSONSerialization.data(withJSONObject: message.body, options: [.prettyPrinted]),
+                  let string = String(data: data, encoding: .utf8) {
+            Self.writeRaw(string, to: outputURL)
+        } else {
+            Self.write(["event": "interactionProbeFailed", "error": "Probe posted a non-serializable message."], to: outputURL)
+        }
+    }
+
+    private static func runInteractionProbe(in webView: WKWebView, outputURL: URL) {
+        let script = """
+        window.__deepseekAgentProbeResult = "";
+        (() => {
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          const text = () => document.body ? document.body.innerText : "";
+          let posted = false;
+          const postProbe = (value) => {
+            if (posted) return;
+            posted = true;
+            const json = JSON.stringify(value);
+            window.__deepseekAgentProbeResult = json;
+            window.webkit?.messageHandlers?.deepseekAgentProbe?.postMessage(json);
+          };
+          const watchdog = setTimeout(() => {
+            postProbe({
+              event: "interactionProbe",
+              interactionPassed: false,
+              error: "Probe watchdog timed out",
+              bodyText: text().slice(0, 2000)
+            });
+          }, 20000);
+          const clickButton = (match) => {
+            const buttons = Array.from(document.querySelectorAll("button"));
+            const button = buttons.find((candidate) => {
+              const label = candidate.getAttribute("aria-label") || candidate.innerText || "";
+              return typeof match === "string" ? label.includes(match) : match.test(label);
+            });
+            if (!button) throw new Error(`Missing button: ${match}`);
+            if (button.disabled) throw new Error(`Disabled button: ${match}`);
+            button.click();
+          };
+          const waitForEnabledButton = async (match, timeout = 5000) => {
+            const started = Date.now();
+            while (Date.now() - started < timeout) {
+              const buttons = Array.from(document.querySelectorAll("button"));
+              const button = buttons.find((candidate) => {
+                const label = candidate.getAttribute("aria-label") || candidate.innerText || "";
+                return typeof match === "string" ? label.includes(match) : match.test(label);
+              });
+              if (button && !button.disabled) return true;
+              await sleep(100);
+            }
+            throw new Error(`Timed out waiting for enabled button: ${match}`);
+          };
+          const waitForText = async (needle, timeout = 5000) => {
+            const started = Date.now();
+            while (Date.now() - started < timeout) {
+              if (text().includes(needle)) return true;
+              await sleep(100);
+            }
+            throw new Error(`Timed out waiting for: ${needle}`);
+          };
+
+          (async () => {
+            const result = {
+              event: "interactionProbe",
+              completedSetup: false,
+              freshThreadNoFiles: false,
+              sentPrompt: false,
+              sawApproval: false,
+              approved: false,
+              reviewedChanges: false,
+              bodyText: ""
+            };
+
+            await waitForText("First Run Setup", 10000);
+            clickButton("Enable Demo Mode");
+            await sleep(100);
+            clickButton("Complete Setup");
+            await waitForText("Project Command Center");
+            result.completedSetup = true;
+
+            clickButton(/New thread/);
+            await waitForText("New chat");
+            result.freshThreadNoFiles = !text().includes("web/src/embedded/chat/App.tsx") && text().includes("No changed files yet");
+
+            clickButton("Explain this project");
+            await sleep(100);
+            clickButton("Send prompt");
+            result.sentPrompt = true;
+            await sleep(2000);
+
+            await waitForText("Run local verification");
+            result.sawApproval = true;
+            clickButton("Allow once");
+            await waitForText("Approval granted");
+            result.approved = true;
+
+            clickButton("Review changes");
+            await waitForText("web/src/embedded/chat/App.tsx");
+            clickButton("Select web/src/embedded/chat/App.tsx");
+            await waitForEnabledButton("Apply selected");
+            clickButton("Apply selected");
+            await waitForText("Accepted 1 file");
+            result.reviewedChanges = text().includes("Commit 1 file");
+
+            result.bodyText = text().slice(0, 2000);
+            result.interactionPassed = result.completedSetup && result.freshThreadNoFiles && result.sentPrompt && result.sawApproval && result.approved && result.reviewedChanges;
+            clearTimeout(watchdog);
+            postProbe(result);
+          })().catch((error) => {
+            clearTimeout(watchdog);
+            postProbe({
+              event: "interactionProbe",
+              interactionPassed: false,
+              error: error instanceof Error ? error.message : String(error),
+              bodyText: text().slice(0, 2000)
+            });
+          });
+        })();
+        "started";
+        """
+        Self.write(["event": "interactionProbeStarted"], to: outputURL)
+        webView.evaluateJavaScript(script) { result, error in
+            if let error {
+                Self.write(["event": "interactionProbeFailed", "error": error.localizedDescription], to: outputURL)
+                return
+            }
+            _ = result
         }
     }
 

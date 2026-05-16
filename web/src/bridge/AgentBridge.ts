@@ -27,11 +27,13 @@ export interface SaveRuntimeSettingsRequest {
   model: string;
   apiKey?: string;
   sidecarPath?: string;
+  startRuntime?: boolean;
 }
 
 export interface AgentBridge {
   getRuntimeSettings(): Promise<RuntimeSettingsSnapshot>;
   saveRuntimeSettings(req: SaveRuntimeSettingsRequest): Promise<RuntimeSettingsSnapshot>;
+  clearAPIKey(): Promise<RuntimeSettingsSnapshot>;
   useDemoRuntime(): Promise<RuntimeSettingsSnapshot>;
   health(): Promise<RuntimeHealth>;
   runtimeInfo(): Promise<RuntimeInfo>;
