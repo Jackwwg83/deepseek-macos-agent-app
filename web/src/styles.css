@@ -442,6 +442,7 @@ kbd {
 
 .nav-button,
 .project-button,
+.workspace-label,
 .folder-button,
 .thread-button,
 .account-button {
@@ -468,6 +469,7 @@ kbd {
 
 .nav-button.active,
 .project-button.active,
+.workspace-label.active,
 .thread-button.active {
   background: rgba(51, 102, 255, 0.09);
   box-shadow: inset 0 0 0 1px rgba(51, 102, 255, 0.12);

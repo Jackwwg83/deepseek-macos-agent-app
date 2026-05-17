@@ -27,7 +27,7 @@ import type { ApprovalDecision, ApprovalRequest, RuntimeHealth, RuntimeInfo, Run
 
 type AppView = "setup" | "thread" | "settings";
 type NativeCommand = "newThread" | "commandPalette" | "settings" | "stopTurn" | "demoRuntime";
-type SettingsSheet = "account" | "rotateKey" | null;
+type SettingsSheet = "rotateKey" | null;
 type TuiMode = "Plan" | "Agent" | "YOLO";
 type ApprovalPolicy = "suggest" | "auto" | "never";
 
@@ -683,7 +683,6 @@ export function App() {
                   onBaseURLChange={setBaseURL}
                   onClearAutoAllowRules={clearAutoAllowRules}
                   onDeleteKey={() => void deleteAPIKey()}
-                  onManageAccount={() => setSettingsSheet("account")}
                   onModelChange={setModel}
                   onPersistEndpoint={(nextBaseURL) => void persistRuntimePreference({ baseURL: nextBaseURL, startRuntime: false }).then(() => setActionNote("Endpoint preference saved."))}
                   onPersistModel={(nextModel) => void updateModelPreference(nextModel)}
@@ -726,7 +725,6 @@ export function App() {
         <SettingsModal
           apiKeyDraft={apiKeyDraft}
           hasAPIKey={hasAPIKey}
-          sheet={settingsSheet}
           onAPIKeyChange={setApiKeyDraft}
           onClose={() => setSettingsSheet(null)}
           onDeleteKey={() => void deleteAPIKey()}
@@ -788,7 +786,6 @@ function SetupScreen({
       <section className="setup-card">
         <div className="setup-topbar">
           <BrandTitle />
-          <button className="text-button" type="button" disabled title="Help opens after onboarding docs are bundled.">Need help?</button>
         </div>
         <div className="setup-heading">
           <h2>First Run Setup</h2>
@@ -873,10 +870,10 @@ function LeftNavigation({
       <div className="sidebar-section projects-section">
         <p className="sidebar-label">Workspace</p>
         <div className="project-tree">
-          <button className="project-button active" type="button">
+          <div className="workspace-label active">
             <Folder size={16} aria-hidden="true" />
             {activeProjectName}
-          </button>
+          </div>
         </div>
       </div>
       <div className="sidebar-section">
@@ -1072,7 +1069,6 @@ function RuntimeSettings({
   onBaseURLChange,
   onClearAutoAllowRules,
   onDeleteKey,
-  onManageAccount,
   onModelChange,
   onPersistEndpoint,
   onPersistModel,
@@ -1097,7 +1093,6 @@ function RuntimeSettings({
   onBaseURLChange(value: string): void;
   onClearAutoAllowRules(): void;
   onDeleteKey(): void;
-  onManageAccount(): void;
   onModelChange(value: string): void;
   onPersistEndpoint(value: string): void;
   onPersistModel(value: string): void;
@@ -1152,7 +1147,6 @@ function RuntimeSettings({
           <input aria-label="Runtime API key" className="field-input" type="password" value={apiKeyDraft} placeholder={hasAPIKey ? "Saved in Keychain" : "Paste API key"} onChange={(event) => onAPIKeyChange(event.target.value)} />
           <button className="secondary-button" type="button" onClick={onRotateKey}>Rotate key</button>
           <button className="secondary-button danger" type="button" onClick={onDeleteKey} disabled={!hasAPIKey} title={hasAPIKey ? "Delete saved API key" : "No API key is saved."}>Delete key</button>
-          <button className="secondary-button" type="button" onClick={onManageAccount}>Manage account</button>
         </div>
       </Card>
       <Card className="settings-card">
@@ -1415,7 +1409,6 @@ function SettingsModal({
   onClose,
   onDeleteKey,
   onSaveKey,
-  sheet,
 }: {
   apiKeyDraft: string;
   hasAPIKey: boolean;
@@ -1423,33 +1416,21 @@ function SettingsModal({
   onClose(): void;
   onDeleteKey(): void;
   onSaveKey(): void;
-  sheet: Exclude<SettingsSheet, null>;
 }) {
   return (
     <div className="sheet-backdrop" role="presentation" onClick={onClose}>
-      <section className="settings-sheet" role="dialog" aria-modal="true" aria-label={sheet === "rotateKey" ? "Rotate API key" : "Manage account"} onClick={(event) => event.stopPropagation()}>
+      <section className="settings-sheet" role="dialog" aria-modal="true" aria-label="Rotate API key" onClick={(event) => event.stopPropagation()}>
         <header className="sheet-header">
-          <h2>{sheet === "rotateKey" ? "Rotate API key" : "Manage account"}</h2>
+          <h2>Rotate API key</h2>
           <button className="icon-only" type="button" aria-label="Close sheet" onClick={onClose}><X size={16} aria-hidden="true" /></button>
         </header>
-        {sheet === "rotateKey" ? (
-          <>
-            <p className="empty-state">Enter a new DeepSeek API key. The app saves it through the native Keychain bridge and then clears this field.</p>
-            <input className="field-input" type="password" value={apiKeyDraft} placeholder={hasAPIKey ? "New API key" : "Paste API key"} onChange={(event) => onAPIKeyChange(event.target.value)} autoFocus />
-            <div className="sheet-actions">
-              <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
-              <button className="secondary-button danger" type="button" disabled={!hasAPIKey} onClick={onDeleteKey}>Delete key</button>
-              <button className="primary-button" type="button" disabled={!apiKeyDraft.trim()} onClick={onSaveKey}>Save key</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="empty-state">DeepSeek account controls are local to this Mac for the MVP. API keys are configured through the Keychain section and runtime state is visible in the inspector.</p>
-            <div className="sheet-actions">
-              <button className="primary-button" type="button" onClick={onClose}>Done</button>
-            </div>
-          </>
-        )}
+        <p className="empty-state">Enter a new DeepSeek API key. The app saves it through the native Keychain bridge and then clears this field.</p>
+        <input className="field-input" type="password" value={apiKeyDraft} placeholder={hasAPIKey ? "New API key" : "Paste API key"} onChange={(event) => onAPIKeyChange(event.target.value)} autoFocus />
+        <div className="sheet-actions">
+          <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
+          <button className="secondary-button danger" type="button" disabled={!hasAPIKey} onClick={onDeleteKey}>Delete key</button>
+          <button className="primary-button" type="button" disabled={!apiKeyDraft.trim()} onClick={onSaveKey}>Save key</button>
+        </div>
       </section>
     </div>
   );
@@ -1491,7 +1472,7 @@ function InspectorCard({ children, title }: { children?: ReactNode; title?: stri
 }
 
 function InspectorHeader({ title }: { title: string }) {
-  return <header className="inspector-header"><h2>{title}</h2><button className="icon-only" type="button" disabled title="Inspector stays visible in this MVP." aria-label="Close inspector"><X size={16} aria-hidden="true" /></button></header>;
+  return <header className="inspector-header"><h2>{title}</h2></header>;
 }
 
 function StatusValue({ label, tone }: { label: string; tone: "ok" | "danger" }) {

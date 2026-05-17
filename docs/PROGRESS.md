@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-05-17 - Alpha.10 Placeholder Cleanup
+
+### Changed
+
+- Removed user-visible placeholder controls: first-run `Need help?`, inspector close button, and settings `Manage account`.
+- Converted the left workspace row from a no-action button into a static workspace label.
+- Deleted unused legacy React components that belonged to the old placeholder UI path.
+- Expanded packaged-app verification to reject those removed placeholder strings if they reappear.
+- Bumped tester package metadata and README release link to `v0.1.0-alpha.10`.
+
+### Verification
+
+Completed:
+
+- `npm --prefix web test -- appInteractions.test.tsx`: 1 file, 10 tests passed.
+- `npm --prefix web run lint`: passed.
+- `npm --prefix web run typecheck`: passed.
+- `bash scripts/dev/check.sh`: `check-ok`.
+- `DEEPSEEK_AGENT_WEBVIEW_INTERACTION_PROBE=1 bash scripts/dev/verify_tester_alpha.sh`: `packaged-app-interaction-ok`, `verify-tester-alpha-ok`.
+
 ## 2026-05-17 - Alpha.9 Workspace Browse Fix
 
 ### Changed

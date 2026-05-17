@@ -47,7 +47,7 @@ if rg -n 'type="module"|crossorigin' "$WEB_INDEX" >/dev/null 2>&1; then
   exit 1
 fi
 
-STALE_DEMO_PATTERN='recipe-app|agent-tools-samples|photobooth|wanderlust|game-experiment|Add drag and drop to gallery|PromptDialog|ArchiveView|RootHeader|sunset over mountains|/Users/local|demo-project|fake-runtime|Advanced sidecar path|Start DeepSeek'
+STALE_DEMO_PATTERN='recipe-app|agent-tools-samples|photobooth|wanderlust|game-experiment|Add drag and drop to gallery|PromptDialog|ArchiveView|RootHeader|sunset over mountains|/Users/local|demo-project|fake-runtime|Advanced sidecar path|Start DeepSeek|Need help\\?|Help opens after onboarding docs are bundled|Manage account|DeepSeek account controls are local|Close inspector|Inspector stays visible'
 if rg -n "$STALE_DEMO_PATTERN" "$WEB_DIR" "$APP_EXEC" >/dev/null 2>&1; then
   echo "verify-failed: package contains stale demo/mock UI strings"
   rg -n "$STALE_DEMO_PATTERN" "$WEB_DIR" "$APP_EXEC" || true

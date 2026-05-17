@@ -8,7 +8,7 @@ It bundles the web UI and a `deepseek-tui` sidecar. Test users do not need to in
 
 Latest tester alpha:
 
-[DeepSeek Agent v0.1.0-alpha.9](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.9)
+[DeepSeek Agent v0.1.0-alpha.10](https://github.com/Jackwwg83/deepseek-macos-agent-app/releases/tag/v0.1.0-alpha.10)
 
 Download:
 

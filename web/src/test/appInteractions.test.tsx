@@ -53,6 +53,7 @@ describe("DeepSeek Agent TUI-aligned app interactions", () => {
 
     expect(screen.getByRole("button", { name: "Enable Demo Mode" }).getAttribute("aria-pressed")).toBe("false");
     expect(screen.getByLabelText("DeepSeek API key")).toHaveProperty("placeholder", "Paste API key");
+    expect(screen.queryByRole("button", { name: /need help/i })).toBeNull();
     expect(Array.from((screen.getByLabelText("Setup model") as HTMLSelectElement).options).map((option) => option.value)).toEqual([
       "deepseek-v4-flash",
       "deepseek-v4-pro",
@@ -85,6 +86,8 @@ describe("DeepSeek Agent TUI-aligned app interactions", () => {
     expect(screen.queryByRole("button", { name: "Skills" })).toBeNull();
     expect(screen.queryByRole("button", { name: /commit/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /apply selected/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /demo workspace/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /close inspector/i })).toBeNull();
   });
 
   it("shows TUI mode, approval policy, workspace boundary, and runtime status", async () => {
@@ -187,6 +190,7 @@ describe("DeepSeek Agent TUI-aligned app interactions", () => {
     expect(screen.getByLabelText("Settings model")).toHaveProperty("value", "deepseek-v4-pro");
     await user.click(screen.getByRole("button", { name: /run diagnostics/i }));
     expect(await screen.findByText(/Diagnostics: ok/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /manage account/i })).toBeNull();
     await user.click(screen.getByRole("button", { name: /rotate key/i }));
     expect(await screen.findByRole("dialog", { name: /rotate api key/i })).toBeTruthy();
   });

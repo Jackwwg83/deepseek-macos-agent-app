@@ -49,7 +49,7 @@ final class DeepSeekTuiRuntimeClient: AgentRuntimeClient {
     }
 
     private static var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0-alpha.9"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0-alpha.10"
     }
 
     func listThreads(limit: Int?, includeArchived: Bool) async throws -> [RuntimeThread] {
