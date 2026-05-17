@@ -93,6 +93,10 @@ export class FakeAgentBridge implements AgentBridge {
     return this.getRuntimeSettings();
   }
 
+  async chooseWorkspaceFolder(_currentPath: string): Promise<{ path: string }> {
+    return { path: "/Users/tester/DeepSeekAgent" };
+  }
+
   async health(): Promise<RuntimeHealth> {
     return { status: "ok", mode: "fake", message: "Demo runtime connected" };
   }

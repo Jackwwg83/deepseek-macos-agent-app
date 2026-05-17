@@ -85,6 +85,10 @@ final class ShellWindowController: NSWindowController {
             useDemoRuntime: { [weak self] in
                 guard let self else { throw RuntimeClientError.unsupported("Window is no longer available.") }
                 return try self.useDemoRuntimeFromWeb()
+            },
+            chooseWorkspaceFolder: { [weak self] currentPath in
+                guard let self else { throw RuntimeClientError.unsupported("Window is no longer available.") }
+                return self.chooseWorkspaceFolderFromWeb(currentPath: currentPath)
             }
         )
     }
@@ -312,6 +316,36 @@ final class ShellWindowController: NSWindowController {
     private func useDemoRuntimeFromWeb() throws -> RuntimeSettingsSnapshot {
         switchToFakeRuntime(reloadWebView: false)
         return try runtimeSettingsSnapshot()
+    }
+
+    private func chooseWorkspaceFolderFromWeb(currentPath: String?) -> ChooseWorkspaceFolderResponse {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Choose"
+        panel.message = "Choose the workspace folder DeepSeek Agent can use for local tools."
+        if let directoryURL = existingDirectoryURL(from: currentPath) {
+            panel.directoryURL = directoryURL
+        }
+
+        guard panel.runModal() == .OK, let selectedURL = panel.url else {
+            return ChooseWorkspaceFolderResponse(path: nil)
+        }
+        return ChooseWorkspaceFolderResponse(path: selectedURL.path)
+    }
+
+    private func existingDirectoryURL(from path: String?) -> URL? {
+        guard let rawPath = path?.trimmingCharacters(in: .whitespacesAndNewlines), !rawPath.isEmpty else {
+            return nil
+        }
+        let expandedPath = (rawPath as NSString).expandingTildeInPath
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: expandedPath, isDirectory: &isDirectory), isDirectory.boolValue {
+            return URL(fileURLWithPath: expandedPath, isDirectory: true)
+        }
+        return nil
     }
 
     private func startRealRuntime(settings: RuntimeSettings) throws {

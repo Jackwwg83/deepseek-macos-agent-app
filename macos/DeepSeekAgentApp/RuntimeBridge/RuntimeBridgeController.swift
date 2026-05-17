@@ -92,6 +92,11 @@ final class RuntimeBridgeController: NSObject, WKScriptMessageHandler, WKScriptM
             return try await MainActor.run {
                 try encoder.encode(try requireNativeActions().useDemoRuntime())
             }
+        case .chooseWorkspaceFolder:
+            let payload = try envelope.payload?.decoded(as: ChooseWorkspaceFolderPayload.self) ?? ChooseWorkspaceFolderPayload(currentPath: nil)
+            return try await MainActor.run {
+                try encoder.encode(try requireNativeActions().chooseWorkspaceFolder(payload.currentPath))
+            }
         case .health:
             return try encoder.encode(try await client.health())
         case .runtimeInfo:

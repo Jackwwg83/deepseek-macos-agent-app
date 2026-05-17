@@ -1,6 +1,6 @@
 # TUI-Aligned Acceptance Checklist
 
-Status: PASS on 2026-05-16.
+Status: PASS on 2026-05-17.
 
 ## 1. Launch and Window
 
@@ -17,7 +17,7 @@ Status: PASS on 2026-05-16.
 - [x] DeepSeek URL input accepts `https://` and self-hosted `http://` endpoints.
 - [x] API key input accepts a key and does not write it into a plain config file.
 - [x] Model selector only shows DeepSeek models.
-- [x] Workspace path is visible and editable with a clearly labeled Browse fallback.
+- [x] Workspace path is visible, editable, and supports a native macOS Browse folder picker.
 - [x] Demo Mode works without an API key.
 - [x] Complete Setup lands on the thread workbench, not Project Command Center.
 - [x] No system Keychain password prompt appears during normal setup.

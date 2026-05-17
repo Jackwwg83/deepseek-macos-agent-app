@@ -5,6 +5,7 @@ enum BridgeMethod: String, Codable, CaseIterable {
     case saveRuntimeSettings
     case clearAPIKey
     case useDemoRuntime
+    case chooseWorkspaceFolder
     case health
     case runtimeInfo
     case listThreads
@@ -112,9 +113,18 @@ struct SaveRuntimeSettingsPayload: Codable, Equatable {
     var startRuntime: Bool?
 }
 
+struct ChooseWorkspaceFolderPayload: Codable, Equatable {
+    var currentPath: String?
+}
+
+struct ChooseWorkspaceFolderResponse: Codable, Equatable {
+    var path: String?
+}
+
 struct NativeRuntimeBridgeActions {
     var getRuntimeSettings: () throws -> RuntimeSettingsSnapshot
     var saveRuntimeSettings: (SaveRuntimeSettingsPayload) throws -> RuntimeSettingsSnapshot
     var clearAPIKey: () throws -> RuntimeSettingsSnapshot
     var useDemoRuntime: () throws -> RuntimeSettingsSnapshot
+    var chooseWorkspaceFolder: (String?) throws -> ChooseWorkspaceFolderResponse
 }

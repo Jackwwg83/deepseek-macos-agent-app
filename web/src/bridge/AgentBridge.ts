@@ -30,11 +30,16 @@ export interface SaveRuntimeSettingsRequest {
   startRuntime?: boolean;
 }
 
+export interface ChooseWorkspaceFolderResponse {
+  path?: string;
+}
+
 export interface AgentBridge {
   getRuntimeSettings(): Promise<RuntimeSettingsSnapshot>;
   saveRuntimeSettings(req: SaveRuntimeSettingsRequest): Promise<RuntimeSettingsSnapshot>;
   clearAPIKey(): Promise<RuntimeSettingsSnapshot>;
   useDemoRuntime(): Promise<RuntimeSettingsSnapshot>;
+  chooseWorkspaceFolder(currentPath: string): Promise<ChooseWorkspaceFolderResponse>;
   health(): Promise<RuntimeHealth>;
   runtimeInfo(): Promise<RuntimeInfo>;
   listThreads(query?: ListThreadsQuery): Promise<RuntimeThread[]>;

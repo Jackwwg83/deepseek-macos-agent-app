@@ -55,7 +55,7 @@ enum AppWebViewFactory {
             objc_setAssociatedObject(webView, &AssociatedKeys.probe, probe, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
         bridge?.attach(to: webView)
-        webView.customUserAgent = "DeepSeekAgentApp/0.1.0-alpha.8"
+        webView.customUserAgent = "DeepSeekAgentApp/0.1.0-alpha.9"
         loadContent(in: webView, environment: environment)
         probe?.scheduleWork(in: webView)
         if let bridge {

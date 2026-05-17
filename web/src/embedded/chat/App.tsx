@@ -369,6 +369,18 @@ export function App() {
     }
   }
 
+  async function browseWorkspaceFolder() {
+    try {
+      const result = await bridge.chooseWorkspaceFolder(workspace);
+      if (result.path) {
+        setWorkspace(result.path);
+        setActionNote("Workspace folder selected.");
+      }
+    } catch (browseError) {
+      setError(browseError instanceof Error ? browseError.message : "Failed to choose workspace folder");
+    }
+  }
+
   function selectThread(id: string) {
     setSelectedThreadId(id);
     setSetupComplete(true);
@@ -610,10 +622,7 @@ export function App() {
             }}
             onModelChange={setModel}
             onWorkspaceChange={setWorkspace}
-            onBrowseWorkspace={() => {
-              setWorkspace("~/DeepSeekAgent");
-              setActionNote("Demo workspace selected. Native folder picker will replace this placeholder after signing.");
-            }}
+            onBrowseWorkspace={() => void browseWorkspaceFolder()}
             onComplete={() => void completeSetup()}
           />
         ) : (

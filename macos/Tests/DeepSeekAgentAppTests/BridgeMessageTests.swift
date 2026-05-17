@@ -11,6 +11,14 @@ final class BridgeMessageTests: XCTestCase {
         XCTAssertEqual(envelope.method, .health)
     }
 
+    func testDecodesChooseWorkspaceFolderMethod() throws {
+        let data = #"{"id":"1","method":"chooseWorkspaceFolder","payload":{}}"#.data(using: .utf8)!
+
+        let envelope = try BridgeMessageDecoder.decode(data: data)
+
+        XCTAssertEqual(envelope.method, .chooseWorkspaceFolder)
+    }
+
     func testRejectsUnknownMethod() {
         let data = #"{"id":"1","method":"deleteEverything","payload":{}}"#.data(using: .utf8)!
 
@@ -35,4 +43,3 @@ final class BridgeMessageTests: XCTestCase {
         }
     }
 }
-

@@ -1,4 +1,4 @@
-import type { AgentBridge, RuntimeSettingsSnapshot, SaveRuntimeSettingsRequest } from "./AgentBridge";
+import type { AgentBridge, ChooseWorkspaceFolderResponse, RuntimeSettingsSnapshot, SaveRuntimeSettingsRequest } from "./AgentBridge";
 import type {
   ApprovalDecision,
   ApprovalResponse,
@@ -21,6 +21,7 @@ type NativeMethod =
   | "saveRuntimeSettings"
   | "clearAPIKey"
   | "useDemoRuntime"
+  | "chooseWorkspaceFolder"
   | "health"
   | "runtimeInfo"
   | "listThreads"
@@ -100,6 +101,10 @@ export class WebViewAgentBridge implements AgentBridge {
 
   useDemoRuntime(): Promise<RuntimeSettingsSnapshot> {
     return this.request("useDemoRuntime", {});
+  }
+
+  chooseWorkspaceFolder(currentPath: string): Promise<ChooseWorkspaceFolderResponse> {
+    return this.request("chooseWorkspaceFolder", { currentPath });
   }
 
   health(): Promise<RuntimeHealth> {

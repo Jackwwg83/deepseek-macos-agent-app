@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-05-17 - Alpha.9 Workspace Browse Fix
+
+### Changed
+
+- Replaced the First Run Setup `Browse` placeholder with a native macOS folder picker.
+- Added WebView bridge support for `chooseWorkspaceFolder`.
+- Added frontend and Swift bridge regression tests for workspace folder selection.
+- Bumped tester package metadata and README release link to `v0.1.0-alpha.9`.
+
+### Verification
+
+Completed:
+
+- `npm --prefix web test -- appInteractions.test.tsx`: 1 file, 10 tests passed.
+- `cd macos && swift test --filter BridgeMessageTests/testDecodesChooseWorkspaceFolderMethod`: passed.
+- `bash scripts/dev/check.sh`: `check-ok`.
+
 ## 2026-05-16 - TUI-Aligned Product Reset
 
 ### Changed

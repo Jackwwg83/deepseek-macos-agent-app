@@ -64,6 +64,17 @@ describe("DeepSeek Agent TUI-aligned app interactions", () => {
     expect(screen.getByText(/HTTP endpoint is not encrypted/i)).toBeTruthy();
   });
 
+  it("lets Browse choose a workspace folder during setup", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("heading", { name: "First Run Setup" });
+
+    expect(screen.getByLabelText("Workspace folder")).toHaveProperty("value", "~/DeepSeekAgent");
+    await user.click(screen.getByRole("button", { name: "Browse" }));
+
+    expect(await screen.findByDisplayValue("/Users/tester/DeepSeekAgent")).toBeTruthy();
+  });
+
   it("lands on a thread-first workbench and removes old product workflow entries", async () => {
     await completeDemoSetup();
 
